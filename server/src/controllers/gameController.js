@@ -176,6 +176,8 @@ function handleGameEvents(io) {
             
             for (const [roomId, game] of games.entries()) {
                 if (game.players.has(socket.id)) {
+                    const player = game.players.get(socket.id);
+
                     // 如果是房主断开连接，转移房主权限给下一个玩家
                     if (game.hostId === socket.id) {
                         const remainingPlayers = Array.from(game.players.keys());
@@ -187,17 +189,22 @@ function handleGameEvents(io) {
 
                     const result = game.removePlayer(socket.id);
                     
+                    // 广播玩家离开事件
+                    io.to(roomId).emit('playerLeft', {
+                        playerId: socket.id,
+                        playerName: player.name,
+                        newState: game.getGameState()
+                    });
+
                     if (result) {
                         io.to(roomId).emit('gameOver', { winner: result });
                         games.delete(roomId);
                     } else if (game.players.size < 4) {
                         io.to(roomId).emit('gameError', '玩家数量不足，游戏终止');
                         games.delete(roomId);
-                    } else {
-                        io.to(roomId).emit('gameStateUpdate', game.getGameState());
                     }
                     
-                    // 立即广播房间列表更新
+                    // 更新房间列表
                     broadcastRoomsList();
                     break;
                 }
@@ -209,6 +216,10 @@ function handleGameEvents(io) {
             const game = games.get(roomId);
             if (!game) return;
 
+            // 获取玩家信息，用于广播退出消息
+            const player = game.players.get(socket.id);
+            if (!player) return;
+
             // 如果是房主退出且还有其他玩家，转移房主权限
             if (game.hostId === socket.id && game.players.size > 1) {
                 const remainingPlayers = Array.from(game.players.keys()).filter(id => id !== socket.id);
@@ -218,6 +229,13 @@ function handleGameEvents(io) {
             // 从房间中移除玩家
             socket.leave(roomId);
             const result = game.removePlayer(socket.id);
+
+            // 广播玩家离开事件
+            io.to(roomId).emit('playerLeft', {
+                playerId: socket.id,
+                playerName: player.name,
+                newState: game.getGameState()
+            });
 
             if (result) {
                 io.to(roomId).emit('gameOver', { winner: result });
@@ -229,9 +247,6 @@ function handleGameEvents(io) {
                 // 如果游戏已经开始且人数不足，终止游戏
                 io.to(roomId).emit('gameError', '玩家数量不足，游戏终止');
                 games.delete(roomId);
-            } else {
-                // 广播更新房间状态
-                io.to(roomId).emit('gameStateUpdate', game.getGameState());
             }
 
             // 更新房间列表

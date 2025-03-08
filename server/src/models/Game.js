@@ -121,6 +121,10 @@ class Game {
     }
 
     removePlayer(playerId) {
+        // 在删除玩家之前记录是否是房主
+        const wasHost = this.hostId === playerId;
+        
+        // 删除玩家
         this.players.delete(playerId);
         this.votes.delete(playerId);
         
@@ -136,17 +140,25 @@ class Game {
             this.currentSpeaker = this.speakingOrder[nextIndex];
         }
 
+        // 如果删除的是房主且还有其他玩家，需要转移房主权限
+        if (wasHost && this.players.size > 0) {
+            this.hostId = Array.from(this.players.keys())[0];
+        }
+
         return this.checkGameEnd();
     }
 
     getGameState() {
+        // 确保只返回仍在游戏中的玩家
+        const activePlayers = Array.from(this.players.values()).map(player => ({
+            id: player.id,
+            name: player.name,
+            isAlive: player.isAlive,
+        }));
+
         return {
             state: this.state,
-            players: Array.from(this.players.values()).map(player => ({
-                id: player.id,
-                name: player.name,
-                isAlive: player.isAlive,
-            })),
+            players: activePlayers,  // 这里返回最新的玩家列表
             hostId: this.hostId,
             currentSpeaker: this.currentSpeaker,
             currentRound: this.currentRound,

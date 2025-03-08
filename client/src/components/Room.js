@@ -23,6 +23,7 @@ const Room = ({ roomId }) => {
         if (!socket) return;
 
         socket.on('gameStateUpdate', (newState) => {
+            console.log('Received game state update:', newState);
             setGameState(prev => ({
                 ...prev,
                 ...newState
@@ -59,6 +60,18 @@ const Room = ({ roomId }) => {
             setMessages(prev => [...prev, message]);
         });
 
+        socket.on('playerLeft', ({ playerId, playerName, newState }) => {
+            console.log(`Player ${playerName} left the room`);
+            setGameState(prev => ({
+                ...prev,
+                ...newState
+            }));
+            setMessages(prev => [...prev, {
+                system: true,
+                message: `玩家 ${playerName} 离开了房间`
+            }]);
+        });
+
         return () => {
             socket.off('gameStateUpdate');
             socket.off('playerJoined');
@@ -67,6 +80,7 @@ const Room = ({ roomId }) => {
             socket.off('votingStart');
             socket.off('gameOver');
             socket.off('newMessage');
+            socket.off('playerLeft');
         };
     }, [socket]);
 
@@ -101,6 +115,21 @@ const Room = ({ roomId }) => {
         
         socket.emit('leaveRoom', roomId);
         navigate('/');
+    };
+
+    const renderMessage = (msg, index) => {
+        if (msg.system) {
+            return (
+                <div key={index} className="message system-message">
+                    {msg.message}
+                </div>
+            );
+        }
+        return (
+            <div key={index} className="message">
+                <strong>{msg.playerName}:</strong> {msg.message}
+            </div>
+        );
     };
 
     return (
@@ -175,11 +204,7 @@ const Room = ({ roomId }) => {
 
             <div className="chat">
                 <div className="messages">
-                    {messages.map((msg, index) => (
-                        <div key={index} className="message">
-                            <strong>{msg.playerName}:</strong> {msg.message}
-                        </div>
-                    ))}
+                    {messages.map(renderMessage)}
                 </div>
                 <form onSubmit={handleSendMessage}>
                     <input
