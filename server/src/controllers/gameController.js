@@ -27,10 +27,11 @@ function handleGameEvents(io) {
         socket.emit('roomsListUpdate', getRoomsList());
 
         // 创建房间
-        socket.on('createRoom', (playerName) => {
+        socket.on('createRoom', (username) => {
+            console.log(`Player ${username} creating room`);
             const roomId = generateRoomId();
             const game = new Game(roomId);
-            game.addPlayer(socket.id, playerName);
+            game.addPlayer(socket.id, username);
             games.set(roomId, game);
             
             socket.join(roomId);
@@ -43,8 +44,8 @@ function handleGameEvents(io) {
         });
 
         // 加入房间
-        socket.on('joinRoom', ({ roomId, playerName }) => {
-            console.log(`Player ${playerName} trying to join room ${roomId}`);
+        socket.on('joinRoom', ({ roomId, playerName: username }) => {
+            console.log(`Player ${username} trying to join room ${roomId}`);
             const game = games.get(roomId);
             
             if (!game) {
@@ -65,7 +66,7 @@ function handleGameEvents(io) {
                 return;
             }
 
-            game.addPlayer(socket.id, playerName);
+            game.addPlayer(socket.id, username);
             socket.join(roomId);
             
             // 发送玩家加入成功事件
@@ -76,7 +77,7 @@ function handleGameEvents(io) {
             // 立即广播房间列表更新
             broadcastRoomsList();
             
-            console.log(`Player ${playerName} successfully joined room ${roomId}`);
+            console.log(`Player ${username} successfully joined room ${roomId}`);
         });
 
         // 开始游戏

@@ -17,10 +17,10 @@ class Game {
         this.timer = null;
     }
 
-    addPlayer(playerId, playerName) {
+    addPlayer(playerId, username) {
         this.players.set(playerId, {
             id: playerId,
-            name: playerName,
+            name: username,
             role: null,
             isAlive: true,
             word: null

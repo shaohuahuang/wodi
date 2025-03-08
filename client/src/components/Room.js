@@ -14,7 +14,7 @@ const Room = ({ roomId }) => {
     });
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([]);
-    const [playerName] = useState(localStorage.getItem('playerName') || '未知玩家');
+    const [username] = useState(localStorage.getItem('username') || '未知玩家');
 
     useEffect(() => {
         if (!socket) return;
@@ -92,7 +92,7 @@ const Room = ({ roomId }) => {
             <div className="game-info">
                 <h2>房间号: {roomId}</h2>
                 <div className="current-player-info">
-                    <p>你的名字: <span className="highlight">{playerName}</span></p>
+                    <p>你的名字: <span className="highlight">{username}</span></p>
                     <p>你的身份: <span className="highlight">
                         {gameState.myRole === 'undercover' ? '卧底' : 
                          gameState.myRole === 'civilian' ? '平民' : '等待游戏开始'}
