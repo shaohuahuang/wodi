@@ -208,16 +208,23 @@ class GameManager {
                 });
             });
 
-            // 发送完整消息
+            // 添加到消息历史记录
             const chatMessage = {
                 playerId: currentPlayer.id,
                 playerName: currentPlayer.name,
                 message: fullMessage,
                 timestamp: Date.now(),
-                type: 'speech'  // 添加消息类型
+                type: 'speech'
             };
-            this.messages.push(chatMessage);  // 添加到历史记录
-            this.notifyNewMessage(chatMessage);
+            this.messages.push(chatMessage);
+
+            // 通知AI发言完成
+            this.notifyAISpeaking({
+                playerId: currentPlayer.id,
+                playerName: currentPlayer.name,
+                message: fullMessage,
+                isComplete: true
+            });
 
             // 延迟后结束AI发言
             setTimeout(() => {
@@ -229,10 +236,14 @@ class GameManager {
                 playerId: currentPlayer.id,
                 playerName: currentPlayer.name,
                 message: '对不起，我现在有点混乱...',
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                type: 'speech'
             };
-            this.messages.push(errorMessage);  // 添加到历史记录
-            this.notifyNewMessage(errorMessage);
+            this.messages.push(errorMessage);
+            this.notifyAISpeaking({
+                ...errorMessage,
+                isComplete: true
+            });
             
             // 即使出错也要继续游戏
             setTimeout(() => {
