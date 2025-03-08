@@ -144,21 +144,34 @@ class GameManager {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let fullMessage = '';
+            let isThinking = false;
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 
                 const chunk = decoder.decode(value);
-                // Ollama 返回的是换行分隔的 JSON 字符串
                 const lines = chunk.split('\n').filter(line => line.trim());
                 
                 for (const line of lines) {
                     try {
                         const data = JSON.parse(line);
                         if (data.response) {
-                            fullMessage += data.response;
-                            onChunk(data.response);
+                            const text = data.response;
+                            // 检查是否进入或退出思考模式
+                            if (text.includes('<think>')) {
+                                isThinking = true;
+                            }
+                            if (text.includes('</think>')) {
+                                isThinking = false;
+                                continue;
+                            }
+                            
+                            // 只有在非思考模式下才显示文本
+                            if (!isThinking && !text.includes('<think>') && !text.includes('</think>')) {
+                                fullMessage += text;
+                                onChunk(text);
+                            }
                         }
                     } catch (e) {
                         console.error('解析响应出错:', e);
