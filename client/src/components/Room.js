@@ -30,7 +30,6 @@ const Room = ({ gameManager, username }) => {
         gameManager.onGameStateUpdate = setGameState;
         gameManager.onNewMessage = (msg) => {
             if (msg.clear) {
-                // 如果收到清空消息的信号，清空消息列表
                 setMessages([]);
             } else {
                 setMessages(prev => [...prev, msg]);
@@ -38,11 +37,6 @@ const Room = ({ gameManager, username }) => {
         };
         gameManager.onGameOver = (result) => {
             setGameState(prev => ({ ...prev, currentPhase: 'ended', winner: result.winner }));
-            setMessages(prev => [...prev, 
-                { system: true, message: result.message },
-                { system: true, message: `平民: ${result.civilians.join(', ')}` },
-                { system: true, message: `卧底: ${result.undercovers.join(', ')}` }
-            ]);
         };
         gameManager.onVoteUpdate = ({ votes: newVotes, nextVoter }) => {
             setVotes(new Map(newVotes));
@@ -52,7 +46,7 @@ const Room = ({ gameManager, username }) => {
             if (eliminatedPlayer) {
                 setMessages(prev => [...prev, {
                     system: true,
-                    message: `玩家 ${eliminatedPlayer.name} 被投票出局，身份是${eliminatedPlayer.role === 'undercover' ? '卧底' : '平民'}`
+                    message: `玩家 ${eliminatedPlayer.name} 被投票出局`
                 }]);
             }
             setGameState(prev => ({
@@ -180,10 +174,6 @@ const Room = ({ gameManager, username }) => {
             <div className="game-info">
                 <div className="current-player-info">
                     <p>你的名字: <span className="highlight">{username}</span></p>
-                    <p>你的身份: <span className="highlight">
-                        {gameState.myRole === 'undercover' ? '卧底' : 
-                         gameState.myRole === 'civilian' ? '平民' : '等待游戏开始'}
-                    </span></p>
                     <p>你的词语: <span className="highlight">{gameState.myWord || '等待游戏开始'}</span></p>
                 </div>
             </div>
@@ -328,7 +318,6 @@ const Room = ({ gameManager, username }) => {
                     </h3>
                     <div className="game-stats">
                         <p>游戏结束！</p>
-                        <p>你的身份是: {gameState.myRole === 'undercover' ? '卧底' : '平民'}</p>
                         <p>你的词语是: {gameState.myWord}</p>
                     </div>
                     <button 

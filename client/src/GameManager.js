@@ -619,7 +619,7 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
         this.notifyGameStateUpdate();
     }
 
-    // 计算投票结果
+    // 修改计算投票结果方法
     calculateVoteResult() {
         // 统计每个玩家获得的票数
         const voteCount = new Map();
@@ -647,11 +647,11 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
         // 标记玩家出局
         eliminatedPlayer.isAlive = false;
 
-        // 添加投票结果消息
+        // 添加投票结果消息（不显示身份）
         const resultMessage = {
             system: true,
             type: 'result',
-            message: `投票结束！${eliminatedPlayer.name} 被投票出局了！他的身份是${eliminatedPlayer.role === 'undercover' ? '卧底' : '平民'}！`,
+            message: `投票结束！${eliminatedPlayer.name} 被投票出局了！`,
             timestamp: Date.now()
         };
         this.messages.push(resultMessage);
@@ -665,10 +665,10 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
         // 开始新一轮
         setTimeout(() => {
             this.startNewRound(eliminatedPlayer);
-        }, 3000); // 给玩家一些时间查看结果
+        }, 3000);
     }
 
-    // 检查游戏是否结束
+    // 修改游戏结束检查方法
     checkGameOver() {
         const alivePlayers = this.gameState.players.filter(p => p.isAlive);
         const aliveUndercovers = alivePlayers.filter(p => p.role === 'undercover');
@@ -678,18 +678,15 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
         let winner = null;
         let message = '';
 
-        // 游戏结束条件：
-        // 1. 所有卧底被淘汰 - 平民胜利
         if (aliveUndercovers.length === 0) {
             gameOver = true;
             winner = 'civilians';
-            message = '所有卧底都被找出来了！平民胜利！';
+            message = '游戏结束！平民获胜！';
         }
-        // 2. 卧底数量等于或超过平民数量 - 卧底胜利
         else if (aliveUndercovers.length >= aliveCivilians.length) {
             gameOver = true;
             winner = 'undercover';
-            message = '卧底数量已经和平民一样多了！卧底胜利！';
+            message = '游戏结束！卧底获胜！';
         }
 
         if (gameOver) {
@@ -703,11 +700,11 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
             this.messages.push(endMessage);
             this.notifyNewMessage(endMessage);
 
-            // 公布所有玩家身份
+            // 公布所有玩家身份（只在游戏结束时）
             const rolesMessage = {
                 system: true,
                 type: 'result',
-                message: '游戏结束！所有玩家身份：\n' + 
+                message: '所有玩家身份：\n' + 
                     this.gameState.players.map(p => 
                         `${p.name}: ${p.role === 'undercover' ? '卧底' : '平民'} (${p.word})`
                     ).join('\n'),
@@ -721,21 +718,13 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
             this.gameState.winner = winner;
             this.notifyGameStateUpdate();
 
-            // 通知游戏结束
-            this.notifyGameOver({
-                winner,
-                civilians: this.gameState.players.filter(p => p.role === 'civilian').map(p => p.name),
-                undercovers: this.gameState.players.filter(p => p.role === 'undercover').map(p => p.name),
-                message: message
-            });
-
             return true;
         }
 
         return false;
     }
 
-    // 开始新一轮
+    // 修改开始新一轮方法
     startNewRound(eliminatedPlayer) {
         this.gameState.currentRound++;
         this.gameState.currentPhase = 'speaking';
@@ -744,7 +733,6 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
         const alivePlayers = this.gameState.players.filter(p => p.isAlive);
         this.gameState.speakingOrder = alivePlayers.map(p => p.id);
         
-        // 从第一个存活玩家开始
         this.gameState.currentSpeaker = this.gameState.speakingOrder[0];
         this.gameState.votes = new Map();
 
@@ -758,13 +746,12 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
         this.messages.push(roundMessage);
         this.notifyNewMessage(roundMessage);
 
-        // 通知新一轮开始
+        // 通知新一轮开始（只传递必要信息）
         this.notifyRoundStart({
             round: this.gameState.currentRound,
             currentSpeaker: this.gameState.currentSpeaker,
             eliminatedPlayer: {
-                name: eliminatedPlayer.name,
-                role: eliminatedPlayer.role
+                name: eliminatedPlayer.name
             }
         });
 
