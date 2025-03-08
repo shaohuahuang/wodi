@@ -203,6 +203,40 @@ function handleGameEvents(io) {
                 }
             }
         });
+
+        // 退出房间
+        socket.on('leaveRoom', (roomId) => {
+            const game = games.get(roomId);
+            if (!game) return;
+
+            // 如果是房主退出且还有其他玩家，转移房主权限
+            if (game.hostId === socket.id && game.players.size > 1) {
+                const remainingPlayers = Array.from(game.players.keys()).filter(id => id !== socket.id);
+                game.transferHost(remainingPlayers[0]);
+            }
+
+            // 从房间中移除玩家
+            socket.leave(roomId);
+            const result = game.removePlayer(socket.id);
+
+            if (result) {
+                io.to(roomId).emit('gameOver', { winner: result });
+                games.delete(roomId);
+            } else if (game.players.size === 0) {
+                // 如果房间空了，删除房间
+                games.delete(roomId);
+            } else if (game.players.size < 4 && game.state !== 'waiting') {
+                // 如果游戏已经开始且人数不足，终止游戏
+                io.to(roomId).emit('gameError', '玩家数量不足，游戏终止');
+                games.delete(roomId);
+            } else {
+                // 广播更新房间状态
+                io.to(roomId).emit('gameStateUpdate', game.getGameState());
+            }
+
+            // 更新房间列表
+            broadcastRoomsList();
+        });
     });
 
     // 当服务器关闭时清理定时器

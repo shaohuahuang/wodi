@@ -163,4 +163,45 @@
 
 .start-game-button:hover {
   background-color: #45a049;
+}
+
+.room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.room-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.room-info h2 {
+  margin: 0;
+}
+
+.leave-room-button {
+  background-color: #f44336;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.leave-room-button:hover {
+  background-color: #d32f2f;
+}
+
+/* 如果游戏已经开始，让退出按钮不那么显眼 */
+.leave-room-button.game-started {
+  background-color: #9e9e9e;
+}
+
+.leave-room-button.game-started:hover {
+  background-color: #757575;
 } 

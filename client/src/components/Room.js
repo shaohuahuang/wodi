@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
+import { useNavigate } from 'react-router-dom';
 import '../styles/Room.css';
 
 const Room = ({ roomId }) => {
     const socket = useSocket();
+    const navigate = useNavigate();
     const [gameState, setGameState] = useState({
         players: [],
         currentPhase: 'waiting',
@@ -88,8 +90,36 @@ const Room = ({ roomId }) => {
         }
     };
 
+    const handleLeaveRoom = () => {
+        if (gameState.currentPhase !== 'waiting') {
+            if (!window.confirm('游戏正在进行中，退出将影响其他玩家的游戏体验。确定要退出吗？')) {
+                return;
+            }
+        } else if (!window.confirm('确定要退出房间吗？')) {
+            return;
+        }
+        
+        socket.emit('leaveRoom', roomId);
+        navigate('/');
+    };
+
     return (
         <div className="room">
+            <div className="room-header">
+                <div className="room-info">
+                    <h2>房间号: {roomId}</h2>
+                    {gameState.hostId === socket?.id && (
+                        <span className="host-tag">你是房主</span>
+                    )}
+                </div>
+                <button 
+                    onClick={handleLeaveRoom}
+                    className={`leave-room-button ${gameState.currentPhase !== 'waiting' ? 'game-started' : ''}`}
+                >
+                    退出房间
+                </button>
+            </div>
+
             <div className="game-info">
                 <h2>房间号: {roomId}</h2>
                 <div className="current-player-info">
@@ -99,9 +129,6 @@ const Room = ({ roomId }) => {
                          gameState.myRole === 'civilian' ? '平民' : '等待游戏开始'}
                     </span></p>
                     <p>你的词语: <span className="highlight">{gameState.myWord || '等待游戏开始'}</span></p>
-                    {gameState.hostId === socket?.id && (
-                        <p className="host-tag">你是房主</p>
-                    )}
                 </div>
             </div>
 
