@@ -2,19 +2,41 @@ const Game = require('../models/Game');
 const games = new Map();
 
 function getRoomsList() {
-    return Array.from(games.entries()).map(([roomId, game]) => ({
-        roomId,
-        playerCount: game.players.size,
-        maxPlayers: 8,
-        state: game.state,
-        players: Array.from(game.players.values()).map(p => p.name)
-    }));
+    console.log('Getting rooms list...');
+    console.log('Current games:', Array.from(games.keys()));
+    
+    const roomsList = Array.from(games.entries()).map(([roomId, game]) => {
+        console.log(`Room ${roomId}:`, {
+            playerCount: game.players.size,
+            state: game.state,
+            players: Array.from(game.players.values()).map(p => p.name)
+        });
+        
+        return {
+            roomId,
+            playerCount: game.players.size,
+            maxPlayers: 8,
+            state: game.state,
+            players: Array.from(game.players.values()).map(p => p.name)
+        };
+    });
+    
+    console.log('Final rooms list:', roomsList);
+    return roomsList;
 }
 
 function handleGameEvents(io) {
     // 定期广播房间列表更新
     const broadcastRoomsList = () => {
-        io.emit('roomsListUpdate', getRoomsList());
+        console.log('Broadcasting rooms list...');
+        const roomsList = getRoomsList();
+        if (roomsList.length > 0) {
+            console.log(`Broadcasting ${roomsList.length} rooms`);
+            io.emit('roomsListUpdate', roomsList);
+        } else {
+            console.log('No rooms to broadcast');
+            io.emit('roomsListUpdate', []);
+        }
     };
 
     // 每2秒更新一次房间列表

@@ -11,23 +11,68 @@ const Home = () => {
     const [rooms, setRooms] = useState([]);
     const username = localStorage.getItem('username');
 
+    // 主要的 socket 事件监听和房间列表获取
     useEffect(() => {
         if (!socket) return;
 
+        // 将 fetchRoomsList 移到 useEffect 内部
+        const fetchRoomsList = () => {
+            console.log('Requesting rooms list...');
+            socket.emit('getRoomsList');
+        };
+
         const handleRoomsUpdate = (roomsList) => {
-            console.log('Rooms list updated:', roomsList);
+            console.log('Received rooms list update:', roomsList);
             setRooms(roomsList);
         };
 
+        // 监听房间列表更新
         socket.on('roomsListUpdate', handleRoomsUpdate);
+        
+        // 监听重连事件
+        socket.on('connect', fetchRoomsList);
 
-        // 主动请求房间列表
-        socket.emit('getRoomsList');
+        // 组件挂载时立即获取房间列表
+        fetchRoomsList();
+
+        // 当从房间返回时，重新获取房间列表
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log('Page became visible, fetching rooms list...');
+                fetchRoomsList();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             socket.off('roomsListUpdate', handleRoomsUpdate);
+            socket.off('connect', fetchRoomsList);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [socket]);
+
+    const handleJoinRoom = (roomId) => {
+        if (!socket) {
+            setError('网络连接失败，请刷新页面重试');
+            return;
+        }
+
+        setLoading(true);
+        socket.emit('joinRoom', { roomId, playerName: username });
+        
+        socket.once('joinError', (message) => {
+            setLoading(false);
+            setError(message);
+            // 发生错误时请求房间列表
+            socket.emit('getRoomsList');
+        });
+
+        socket.once('playerJoined', () => {
+            setLoading(false);
+            navigate(`/room/${roomId}`);
+        });
+    };
 
     const handleCreateRoom = () => {
         if (!socket) {
@@ -46,26 +91,8 @@ const Home = () => {
         socket.once('error', (message) => {
             setLoading(false);
             setError(message);
-        });
-    };
-
-    const handleJoinRoom = (roomId) => {
-        if (!socket) {
-            setError('网络连接失败，请刷新页面重试');
-            return;
-        }
-
-        setLoading(true);
-        socket.emit('joinRoom', { roomId, playerName: username });
-        
-        socket.once('joinError', (message) => {
-            setLoading(false);
-            setError(message);
-        });
-
-        socket.once('playerJoined', () => {
-            setLoading(false);
-            navigate(`/room/${roomId}`);
+            // 发生错误时请求房间列表
+            socket.emit('getRoomsList');
         });
     };
 

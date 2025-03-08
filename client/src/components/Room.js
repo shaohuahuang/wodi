@@ -114,7 +114,14 @@ const Room = ({ roomId }) => {
         }
         
         socket.emit('leaveRoom', roomId);
-        navigate('/');
+
+        // 在导航到主页之前先请求最新的房间列表
+        socket.emit('getRoomsList');
+        
+        // 使用 setTimeout 确保在获取房间列表后再导航
+        setTimeout(() => {
+            navigate('/');
+        }, 100);
     };
 
     const renderMessage = (msg, index) => {
