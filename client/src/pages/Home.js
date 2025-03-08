@@ -6,11 +6,10 @@ import '../styles/Home.css';
 const Home = () => {
     const socket = useSocket();
     const navigate = useNavigate();
-    const [playerName, setPlayerName] = useState('');
-    const [roomId, setRoomId] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [rooms, setRooms] = useState([]);
+    const username = localStorage.getItem('username');
 
     useEffect(() => {
         if (!socket) return;
@@ -30,25 +29,17 @@ const Home = () => {
         };
     }, [socket]);
 
-    const handleCreateRoom = (e) => {
-        e.preventDefault();
-        setError('');
-        if (!playerName.trim()) {
-            setError('请输入玩家名称');
-            return;
-        }
+    const handleCreateRoom = () => {
         if (!socket) {
             setError('网络连接失败，请刷新页面重试');
             return;
         }
         
         setLoading(true);
-        socket.emit('createRoom', playerName);
+        socket.emit('createRoom', username);
         
         socket.once('roomCreated', ({ roomId }) => {
             setLoading(false);
-            localStorage.setItem('playerName', playerName);
-            alert(`房间创建成功！房间号：${roomId}`);
             navigate(`/room/${roomId}`);
         });
 
@@ -58,20 +49,14 @@ const Home = () => {
         });
     };
 
-    const handleJoinRoom = (e) => {
-        e.preventDefault();
-        setError('');
-        if (!playerName.trim() || !roomId.trim()) {
-            setError('请输入玩家名称和房间号');
-            return;
-        }
+    const handleJoinRoom = (roomId) => {
         if (!socket) {
             setError('网络连接失败，请刷新页面重试');
             return;
         }
 
         setLoading(true);
-        socket.emit('joinRoom', { roomId: roomId.toUpperCase(), playerName });
+        socket.emit('joinRoom', { roomId, playerName: username });
         
         socket.once('joinError', (message) => {
             setLoading(false);
@@ -80,28 +65,14 @@ const Home = () => {
 
         socket.once('playerJoined', () => {
             setLoading(false);
-            localStorage.setItem('playerName', playerName);
-            navigate(`/room/${roomId.toUpperCase()}`);
+            navigate(`/room/${roomId}`);
         });
     };
 
-    const handleJoinExistingRoom = (selectedRoomId) => {
-        if (!playerName.trim()) {
-            setError('请先输入玩家名称');
-            return;
-        }
-        setRoomId(selectedRoomId);
-        handleJoinRoom(new Event('click'));
-    };
-
-    // 添加登出功能
     const handleLogout = () => {
         localStorage.removeItem('username');
         navigate('/login');
     };
-
-    // 获取存储的用户名
-    const username = localStorage.getItem('username');
 
     return (
         <div className="home">
@@ -117,43 +88,14 @@ const Home = () => {
             
             {error && <div className="error">{error}</div>}
             
-            <div className="form-container">
-                <input
-                    type="text"
-                    value={playerName}
-                    onChange={(e) => setPlayerName(e.target.value)}
-                    placeholder="输入你的名字"
-                    className="input"
+            <div className="create-room">
+                <button 
+                    onClick={handleCreateRoom} 
+                    className="create-button"
                     disabled={loading}
-                />
-                
-                <div className="buttons">
-                    <button 
-                        onClick={handleCreateRoom} 
-                        className="button"
-                        disabled={loading}
-                    >
-                        {loading ? '处理中...' : '创建房间'}
-                    </button>
-                    
-                    <div className="join-room">
-                        <input
-                            type="text"
-                            value={roomId}
-                            onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                            placeholder="输入房间号"
-                            className="input"
-                            disabled={loading}
-                        />
-                        <button 
-                            onClick={handleJoinRoom} 
-                            className="button"
-                            disabled={loading}
-                        >
-                            {loading ? '处理中...' : '加入房间'}
-                        </button>
-                    </div>
-                </div>
+                >
+                    {loading ? '创建中...' : '创建新房间'}
+                </button>
             </div>
 
             <div className="rooms-list-container">
@@ -179,11 +121,11 @@ const Home = () => {
                                 </div>
                                 <button
                                     className="join-button"
-                                    onClick={() => handleJoinExistingRoom(room.roomId)}
+                                    onClick={() => handleJoinRoom(room.roomId)}
                                     disabled={loading || room.state !== 'waiting' || room.playerCount >= room.maxPlayers}
                                 >
                                     {room.state !== 'waiting' ? '游戏中' :
-                                     room.playerCount >= room.maxPlayers ? '已满' : '加入'}
+                                     room.playerCount >= room.maxPlayers ? '已满' : '加入房间'}
                                 </button>
                             </div>
                         ))}

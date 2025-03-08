@@ -1,5 +1,5 @@
 .home {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
 }
@@ -7,27 +7,6 @@
 .home h1 {
   color: #333;
   margin-bottom: 40px;
-}
-
-.form-container {
-  background-color: white;
-  padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.buttons {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-}
-
-.join-room {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
 }
 
 .error {
@@ -156,4 +135,29 @@
 
 .logout-button:hover {
     background-color: #f4511e;
+}
+
+.create-room {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.create-button {
+    padding: 12px 30px;
+    font-size: 18px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.create-button:hover:not(:disabled) {
+    background-color: #45a049;
+}
+
+.create-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
 } 
