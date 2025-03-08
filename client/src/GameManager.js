@@ -94,56 +94,96 @@ class GameManager {
     }
 
     // 开始游戏
-    startGame() {
+    async startGame() {
         if (this.gameState.players.length < this.settings.minPlayers) return false;
         if (this.gameState.players.length > this.settings.maxPlayers) return false;
 
-        // 随机选择一对词语
-        const wordPairIndex = Math.floor(Math.random() * this.wordPairs.length);
-        const words = this.wordPairs[wordPairIndex];
-
-        // 分配角色和词语
-        const totalPlayers = this.gameState.players.length;
-        const undercoverCount = Math.floor(totalPlayers / this.settings.undercoverRatio); // 每4个人1个卧底
-        const roles = new Array(totalPlayers).fill('civilian');
-        
-        // 随机选择卧底
-        for (let i = 0; i < undercoverCount; i++) {
-            let index;
-            do {
-                index = Math.floor(Math.random() * totalPlayers);
-            } while (roles[index] === 'undercover');
-            roles[index] = 'undercover';
-        }
-
-        // 分配角色和词语给玩家
-        this.gameState.players = this.gameState.players.map((player, index) => ({
-            ...player,
-            role: roles[index],
-            word: roles[index] === 'civilian' ? words.civilian : words.undercover
-        }));
-
-        // 设置游戏状态
-        this.gameState = {
-            ...this.gameState,
-            currentPhase: 'speaking',
-            myRole: roles[0], // 房主的角色
-            myWord: roles[0] === 'civilian' ? words.civilian : words.undercover,
-            currentSpeaker: this.gameState.players[0].id, // 从第一个玩家开始
-            currentRound: 1,
-            votes: new Map(),
-            speakingOrder: this.gameState.players.map(p => p.id)
+        // 添加系统消息
+        const preparingMessage = {
+            system: true,
+            type: 'system',
+            message: '正在准备游戏，生成词语中...',
+            timestamp: Date.now()
         };
+        this.messages.push(preparingMessage);
+        this.notifyNewMessage(preparingMessage);
 
-        // 通知游戏开始
-        this.notifyGameStateUpdate();
+        try {
+            // 通过LLM生成词语对
+            const words = await this.generateWordPair();
 
-        // 如果第一个说话的是AI，开始AI行为
-        if (this.gameState.currentSpeaker !== 'host') {
-            this.handleAIActions();
+            // 分配角色和词语
+            const totalPlayers = this.gameState.players.length;
+            const undercoverCount = Math.floor(totalPlayers / this.settings.undercoverRatio);
+            const roles = new Array(totalPlayers).fill('civilian');
+            
+            // 随机选择卧底
+            for (let i = 0; i < undercoverCount; i++) {
+                let index;
+                do {
+                    index = Math.floor(Math.random() * totalPlayers);
+                } while (roles[index] === 'undercover');
+                roles[index] = 'undercover';
+            }
+
+            // 分配角色和词语给玩家
+            this.gameState.players = this.gameState.players.map((player, index) => ({
+                ...player,
+                role: roles[index],
+                word: roles[index] === 'civilian' ? words.civilian : words.undercover
+            }));
+
+            // 设置游戏状态
+            this.gameState = {
+                ...this.gameState,
+                currentPhase: 'speaking',
+                myRole: roles[0], // 房主的角色
+                myWord: roles[0] === 'civilian' ? words.civilian : words.undercover,
+                currentSpeaker: this.gameState.players[0].id, // 从第一个玩家开始
+                currentRound: 1,
+                votes: new Map(),
+                speakingOrder: this.gameState.players.map(p => p.id)
+            };
+
+            // 添加游戏开始消息
+            const startMessage = {
+                system: true,
+                type: 'system',
+                message: '游戏开始！请查看你的词语，第1轮发言开始！',
+                timestamp: Date.now()
+            };
+            this.messages.push(startMessage);
+            this.notifyNewMessage(startMessage);
+
+            // 通知游戏开始
+            this.notifyGameStateUpdate();
+
+            // 如果第一个说话的是AI，开始AI行为
+            if (this.gameState.currentSpeaker !== 'host') {
+                setTimeout(() => {
+                    this.handleAIActions();
+                }, 2000);
+            } else {
+                // 如果是房主发言，开始计时
+                this.startTimer(this.settings.speakingTime);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('开始游戏失败:', error);
+            
+            // 添加错误消息
+            const errorMessage = {
+                system: true,
+                type: 'system',
+                message: '开始游戏失败，请重试',
+                timestamp: Date.now()
+            };
+            this.messages.push(errorMessage);
+            this.notifyNewMessage(errorMessage);
+            
+            return false;
         }
-
-        return true;
     }
 
     // 调用大模型接口
@@ -926,6 +966,35 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
 
         // 处理下一个投票者
         this.handleNextVoter('host');
+    }
+
+    // 添加生成词语对的方法
+    async generateWordPair() {
+        const prompt = `请生成一对相似但有区别的中文词语，用于"谁是卧底"游戏。
+要求：
+1. 两个词语应该相似但有明显区别
+2. 词语应该是常见的名词
+3. 不要太难猜也不要太容易区分
+4. 直接返回JSON格式：{"civilian": "词语1", "undercover": "词语2"}
+5. 不要有任何解释或其他文字`;
+
+        try {
+            const response = await this.callLLM(prompt, () => {});
+            // 尝试从回答中提取JSON
+            const jsonMatch = response.match(/\{.*\}/s);
+            if (jsonMatch) {
+                const wordPair = JSON.parse(jsonMatch[0]);
+                if (wordPair.civilian && wordPair.undercover) {
+                    console.log('生成的词语对:', wordPair);
+                    return wordPair;
+                }
+            }
+            throw new Error('无法解析生成的词语对');
+        } catch (error) {
+            console.error('生成词语对失败:', error);
+            // 如果生成失败，返回预设词语对中的随机一个
+            return this.wordPairs[Math.floor(Math.random() * this.wordPairs.length)];
+        }
     }
 }
 
