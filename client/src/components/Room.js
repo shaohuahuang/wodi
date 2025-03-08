@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/Room.css';
+import GameSettings from './GameSettings';
 
 const Room = ({ gameManager, username }) => {
     const navigate = useNavigate();
@@ -21,6 +22,8 @@ const Room = ({ gameManager, username }) => {
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([]);
     const [votes, setVotes] = useState(new Map());
+    const [timeLeft, setTimeLeft] = useState(0);
+    const [showSettings, setShowSettings] = useState(false);
 
     useEffect(() => {
         // 设置事件处理器
@@ -70,6 +73,7 @@ const Room = ({ gameManager, username }) => {
                 });
             }
         };
+        gameManager.onTimerUpdate = setTimeLeft;
     }, [gameManager]);
 
     useEffect(() => {
@@ -107,7 +111,7 @@ const Room = ({ gameManager, username }) => {
     const renderMessage = (msg, index) => {
         if (msg.system) {
             return (
-                <div key={index} className="message system-message">
+                <div key={index} className={`message system-message ${msg.type || ''}`}>
                     {msg.message}
                 </div>
             );
@@ -129,6 +133,16 @@ const Room = ({ gameManager, username }) => {
 
     const getPlayerVote = (playerId) => {
         return votes.get(playerId);
+    };
+
+    // 添加计时器显示
+    const renderTimer = () => {
+        if (timeLeft <= 0) return null;
+        return (
+            <div className={`timer ${timeLeft <= 10 ? 'urgent' : ''}`}>
+                剩余时间: {timeLeft}秒
+            </div>
+        );
     };
 
     return (
@@ -265,6 +279,12 @@ const Room = ({ gameManager, username }) => {
                         >
                             添加AI玩家
                         </button>
+                        <button 
+                            onClick={() => setShowSettings(true)}
+                            className="settings-button"
+                        >
+                            游戏设置
+                        </button>
                     </>
                 )}
 
@@ -304,7 +324,23 @@ const Room = ({ gameManager, username }) => {
                         <p>你的身份是: {gameState.myRole === 'undercover' ? '卧底' : '平民'}</p>
                         <p>你的词语是: {gameState.myWord}</p>
                     </div>
+                    <button 
+                        onClick={() => gameManager.restartGame()}
+                        className="restart-game-button"
+                    >
+                        重新开始游戏
+                    </button>
                 </div>
+            )}
+
+            {renderTimer()}
+
+            {showSettings && (
+                <GameSettings
+                    settings={gameManager.settings}
+                    onUpdate={gameManager.updateSettings.bind(gameManager)}
+                    onClose={() => setShowSettings(false)}
+                />
             )}
         </div>
     );
