@@ -749,18 +749,222 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
             }
         }
 
-        // 如果有平票，随机选择一个
+        // 如果有多个人获得相同的最高票数，进行重新投票
+        if (eliminatedPlayers.length > 1) {
+            // 添加平票消息
+            const tieMessage = {
+                system: true,
+                type: 'system',
+                message: `出现平票！${eliminatedPlayers.map(id => 
+                    this.gameState.players.find(p => p.id === id).name
+                ).join('、')} 获得相同票数，需要重新投票。`,
+                timestamp: Date.now()
+            };
+            this.messages.push(tieMessage);
+            this.notifyNewMessage(tieMessage);
+
+            // 准备重新投票，只针对平票的玩家
+            this.startTiebreaker(eliminatedPlayers);
+            return;
+        }
+
+        // 如果只有一个人获得最高票，正常处理
+        const eliminatedId = eliminatedPlayers[0];
+        const eliminatedPlayer = this.gameState.players.find(p => p.id === eliminatedId);
+
+        // 标记玩家出局
+        eliminatedPlayer.isAlive = false;
+
+        // 添加投票结果消息
+        const resultMessage = {
+            system: true,
+            type: 'result',
+            message: `投票结束！${eliminatedPlayer.name} 被投票出局了！`,
+            timestamp: Date.now()
+        };
+        this.messages.push(resultMessage);
+        this.notifyNewMessage(resultMessage);
+
+        // 检查游戏是否结束
+        if (this.checkGameOver()) {
+            return;
+        }
+
+        // 开始新一轮
+        setTimeout(() => {
+            this.startNewRound(eliminatedPlayer);
+        }, 3000);
+    }
+
+    // 添加处理平票的方法
+    startTiebreaker(tiedPlayerIds) {
+        // 设置游戏状态为平票决胜
+        this.gameState.currentPhase = 'tiebreaker';
+        this.gameState.tiedPlayers = tiedPlayerIds;
+        this.gameState.votes = new Map();
+        
+        // 设置投票顺序（所有存活玩家）
+        const alivePlayers = this.gameState.players.filter(p => p.isAlive);
+        this.gameState.speakingOrder = alivePlayers.map(p => p.id);
+        
+        // 从第一个玩家开始投票
+        this.gameState.currentVoter = this.gameState.speakingOrder[0];
+        
+        // 通知状态更新
+        this.notifyGameStateUpdate();
+        
+        // 如果第一个投票者是AI，开始AI投票
+        if (this.gameState.currentVoter !== 'host') {
+            setTimeout(() => {
+                this.handleAITiebreakerVote();
+            }, 1000);
+        } else {
+            // 如果是房主投票，开始计时
+            this.startTimer(this.settings.votingTime);
+        }
+    }
+
+    // 添加AI平票决胜投票方法
+    async handleAITiebreakerVote() {
+        const currentPlayer = this.gameState.players.find(p => p.id === this.gameState.currentVoter);
+        if (!currentPlayer) return;
+
+        try {
+            // 构建投票提示词
+            const tiedPlayers = this.gameState.tiedPlayers.map(id => 
+                this.gameState.players.find(p => p.id === id)
+            );
+            
+            const prompt = `你正在玩谁是卧底游戏，现在出现了平票情况，需要你在以下玩家中选择一个投票：
+${tiedPlayers.map(p => p.name).join('、')}
+
+你是${currentPlayer.name}，你的词语是"${currentPlayer.word}"，身份是${currentPlayer.role === 'undercover' ? '卧底' : '平民'}。
+
+请直接回答你要投票的玩家名字，不要有任何解释。`;
+            
+            // 调用大模型获取投票决策
+            let targetId = null;
+            const fullResponse = await this.callLLM(prompt, () => {});  // 不需要逐字显示
+            
+            // 从回答中提取目标玩家
+            for (const player of tiedPlayers) {
+                if (fullResponse.includes(player.name)) {
+                    targetId = player.id;
+                    break;
+                }
+            }
+
+            // 如果没有找到有效目标，随机选择
+            if (!targetId) {
+                const randomIndex = Math.floor(Math.random() * tiedPlayers.length);
+                targetId = tiedPlayers[randomIndex].id;
+            }
+
+            // 延迟一下再投票，模拟思考
+            setTimeout(() => {
+                // 记录投票
+                this.gameState.votes.set(currentPlayer.id, targetId);
+                const targetPlayer = this.gameState.players.find(p => p.id === targetId);
+
+                // 添加投票记录到消息
+                const voteMessage = {
+                    system: true,
+                    type: 'vote',
+                    message: `${currentPlayer.name} 投票给了 ${targetPlayer.name}`,
+                    timestamp: Date.now()
+                };
+                this.messages.push(voteMessage);
+                this.notifyNewMessage(voteMessage);
+
+                // 处理下一个投票者
+                this.handleNextTiebreakerVoter(currentPlayer.id);
+            }, 1500);
+
+        } catch (error) {
+            console.error('AI平票决胜投票出错:', error);
+            // 出错时随机投票
+            const randomIndex = Math.floor(Math.random() * this.gameState.tiedPlayers.length);
+            const targetId = this.gameState.tiedPlayers[randomIndex];
+            
+            // 记录投票
+            this.gameState.votes.set(currentPlayer.id, targetId);
+            const targetPlayer = this.gameState.players.find(p => p.id === targetId);
+            
+            // 添加投票记录到消息
+            const voteMessage = {
+                system: true,
+                type: 'vote',
+                message: `${currentPlayer.name} 投票给了 ${targetPlayer.name}`,
+                timestamp: Date.now()
+            };
+            this.messages.push(voteMessage);
+            this.notifyNewMessage(voteMessage);
+            
+            // 处理下一个投票者
+            this.handleNextTiebreakerVoter(currentPlayer.id);
+        }
+    }
+
+    // 处理平票决胜的下一个投票者
+    handleNextTiebreakerVoter(currentVoterId) {
+        const currentIndex = this.gameState.speakingOrder.indexOf(currentVoterId);
+        const nextIndex = (currentIndex + 1) % this.gameState.speakingOrder.length;
+
+        if (nextIndex === 0) {
+            // 所有人都投票完成，计算结果
+            this.calculateTiebreakerResult();
+        } else {
+            // 继续下一个玩家投票
+            this.gameState.currentVoter = this.gameState.speakingOrder[nextIndex];
+            this.notifyVoteUpdate({
+                votes: Array.from(this.gameState.votes.entries()),
+                nextVoter: this.gameState.currentVoter
+            });
+
+            // 如果下一个还是AI，继续AI投票
+            if (this.gameState.currentVoter !== 'host') {
+                this.handleAITiebreakerVote();
+            } else {
+                // 如果是房主投票，开始计时
+                this.startTimer(this.settings.votingTime);
+            }
+        }
+    }
+
+    // 计算平票决胜的结果
+    calculateTiebreakerResult() {
+        // 统计每个平票玩家获得的票数
+        const voteCount = new Map();
+        for (const [voterId, targetId] of this.gameState.votes.entries()) {
+            const count = voteCount.get(targetId) || 0;
+            voteCount.set(targetId, count + 1);
+        }
+
+        // 找出票数最多的玩家
+        let maxVotes = 0;
+        let eliminatedPlayers = [];
+        for (const playerId of this.gameState.tiedPlayers) {
+            const votes = voteCount.get(playerId) || 0;
+            if (votes > maxVotes) {
+                maxVotes = votes;
+                eliminatedPlayers = [playerId];
+            } else if (votes === maxVotes) {
+                eliminatedPlayers.push(playerId);
+            }
+        }
+
+        // 如果还是平票，随机选择一个
         const eliminatedId = eliminatedPlayers[Math.floor(Math.random() * eliminatedPlayers.length)];
         const eliminatedPlayer = this.gameState.players.find(p => p.id === eliminatedId);
 
         // 标记玩家出局
         eliminatedPlayer.isAlive = false;
 
-        // 添加投票结果消息（不显示身份）
+        // 添加投票结果消息
         const resultMessage = {
             system: true,
             type: 'result',
-            message: `投票结束！${eliminatedPlayer.name} 被投票出局了！`,
+            message: `平票决胜投票结束！${eliminatedPlayer.name} 被投票出局了！`,
             timestamp: Date.now()
         };
         this.messages.push(resultMessage);
@@ -946,8 +1150,13 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
     // 投票方法
     vote(targetId) {
         this.stopTimer();
-        if (this.gameState.currentPhase !== 'voting' || 
+        if ((this.gameState.currentPhase !== 'voting' && this.gameState.currentPhase !== 'tiebreaker') || 
             this.gameState.currentVoter !== 'host') return;
+
+        // 在平票决胜阶段，只能投给平票的玩家
+        if (this.gameState.currentPhase === 'tiebreaker' && !this.gameState.tiedPlayers.includes(targetId)) {
+            return;
+        }
 
         // 记录投票
         this.gameState.votes.set('host', targetId);
@@ -965,7 +1174,11 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
         this.notifyNewMessage(voteMessage);
 
         // 处理下一个投票者
-        this.handleNextVoter('host');
+        if (this.gameState.currentPhase === 'voting') {
+            this.handleNextVoter('host');
+        } else {
+            this.handleNextTiebreakerVoter('host');
+        }
     }
 
     // 添加生成词语对的方法
