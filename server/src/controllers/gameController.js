@@ -1,9 +1,30 @@
 const Game = require('../models/Game');
 const games = new Map();
 
+function getRoomsList() {
+    return Array.from(games.entries()).map(([roomId, game]) => ({
+        roomId,
+        playerCount: game.players.size,
+        maxPlayers: 8,
+        state: game.state,
+        players: Array.from(game.players.values()).map(p => p.name)
+    }));
+}
+
 function handleGameEvents(io) {
+    // 定期广播房间列表更新
+    const broadcastRoomsList = () => {
+        io.emit('roomsListUpdate', getRoomsList());
+    };
+
+    // 每2秒更新一次房间列表
+    const roomsUpdateInterval = setInterval(broadcastRoomsList, 2000);
+
     io.on('connection', (socket) => {
         console.log('New client connected:', socket.id);
+        
+        // 在连接时立即发送房间列表
+        socket.emit('roomsListUpdate', getRoomsList());
 
         // 创建房间
         socket.on('createRoom', (playerName) => {
@@ -17,6 +38,8 @@ function handleGameEvents(io) {
             
             // 广播房间状态
             io.to(roomId).emit('gameStateUpdate', game.getGameState());
+            // 立即广播房间列表更新
+            broadcastRoomsList();
         });
 
         // 加入房间
@@ -50,6 +73,8 @@ function handleGameEvents(io) {
             
             // 广播房间状态更新
             io.to(roomId).emit('gameStateUpdate', game.getGameState());
+            // 立即广播房间列表更新
+            broadcastRoomsList();
             
             console.log(`Player ${playerName} successfully joined room ${roomId}`);
         });
@@ -133,6 +158,11 @@ function handleGameEvents(io) {
             });
         });
 
+        // 请求房间列表
+        socket.on('getRoomsList', () => {
+            socket.emit('roomsListUpdate', getRoomsList());
+        });
+
         // 断开连接处理
         socket.on('disconnect', () => {
             console.log('Client disconnected:', socket.id);
@@ -152,11 +182,18 @@ function handleGameEvents(io) {
                         io.to(roomId).emit('gameStateUpdate', game.getGameState());
                     }
                     
+                    // 立即广播房间列表更新
+                    broadcastRoomsList();
                     break;
                 }
             }
         });
     });
+
+    // 当服务器关闭时清理定时器
+    return () => {
+        clearInterval(roomsUpdateInterval);
+    };
 }
 
 function generateRoomId() {
