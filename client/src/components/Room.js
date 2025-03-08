@@ -19,6 +19,13 @@ const Room = ({ roomId }) => {
     useEffect(() => {
         if (!socket) return;
 
+        socket.on('gameStateUpdate', (newState) => {
+            setGameState(prev => ({
+                ...prev,
+                ...newState
+            }));
+        });
+
         socket.on('playerJoined', ({ players }) => {
             setGameState(prev => ({ ...prev, players }));
         });
@@ -50,6 +57,7 @@ const Room = ({ roomId }) => {
         });
 
         return () => {
+            socket.off('gameStateUpdate');
             socket.off('playerJoined');
             socket.off('gameStarted');
             socket.off('nextSpeaker');
@@ -93,16 +101,31 @@ const Room = ({ roomId }) => {
                 </div>
             </div>
 
-            <div className="players-list">
-                <h3>玩家列表</h3>
-                {gameState.players.map(player => (
-                    <div key={player.id} className={`player ${player.id === socket?.id ? 'current-player' : ''}`}>
-                        <span>{player.name} {player.id === socket?.id ? '(你)' : ''}</span>
-                        {gameState.currentPhase === 'voting' && player.id !== socket?.id && (
-                            <button onClick={() => handleVote(player.id)}>投票</button>
-                        )}
-                    </div>
-                ))}
+            <div className="players-container">
+                <h3>玩家列表 ({gameState.players.length}/8)</h3>
+                <div className="players-list">
+                    {gameState.players.map(player => (
+                        <div key={player.id} className={`player ${player.id === socket?.id ? 'current-player' : ''}`}>
+                            <div className="player-info">
+                                <span className="player-name">{player.name}</span>
+                                {player.id === socket?.id && <span className="player-tag">(你)</span>}
+                                {gameState.currentSpeaker === player.id && 
+                                    <span className="speaking-tag">正在发言</span>}
+                                {!player.isAlive && <span className="dead-tag">已出局</span>}
+                            </div>
+                            {gameState.currentPhase === 'voting' && 
+                             player.id !== socket?.id && 
+                             player.isAlive && (
+                                <button 
+                                    onClick={() => handleVote(player.id)}
+                                    className="vote-button"
+                                >
+                                    投票
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {gameState.currentPhase === 'waiting' && (

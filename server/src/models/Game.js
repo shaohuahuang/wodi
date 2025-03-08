@@ -141,8 +141,14 @@ class Game {
     getGameState() {
         return {
             state: this.state,
-            players: Array.from(this.players.values()),
+            players: Array.from(this.players.values()).map(player => ({
+                id: player.id,
+                name: player.name,
+                isAlive: player.isAlive,
+                // 不要在这里返回role和word，以保持游戏公平性
+            })),
             currentSpeaker: this.currentSpeaker,
+            currentRound: this.currentRound,
             votes: Array.from(this.votes.entries())
         };
     }
