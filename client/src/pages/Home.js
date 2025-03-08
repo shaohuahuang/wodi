@@ -94,9 +94,26 @@ const Home = () => {
         handleJoinRoom(new Event('click'));
     };
 
+    // 添加登出功能
+    const handleLogout = () => {
+        localStorage.removeItem('username');
+        navigate('/login');
+    };
+
+    // 获取存储的用户名
+    const username = localStorage.getItem('username');
+
     return (
         <div className="home">
-            <h1>谁是卧底</h1>
+            <div className="header">
+                <h1>谁是卧底</h1>
+                <div className="user-info">
+                    <span>欢迎, {username}</span>
+                    <button onClick={handleLogout} className="logout-button">
+                        退出登录
+                    </button>
+                </div>
+            </div>
             
             {error && <div className="error">{error}</div>}
             
