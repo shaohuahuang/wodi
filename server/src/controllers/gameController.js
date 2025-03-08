@@ -153,24 +153,33 @@ function handleGameEvents(io) {
             if (!game) return;
 
             if (game.vote(socket.id, targetId)) {
+                // 广播投票更新
                 io.to(roomId).emit('voteUpdated', {
                     votes: Array.from(game.votes.entries())
                 });
 
-                if (game.votes.size === game.players.size) {
+                // 检查是否所有人都投票了
+                if (game.votes.size === game.getAlivePlayersCount()) {
                     const result = game.calculateVoteResult();
                     if (result) {
+                        // 游戏结束
                         io.to(roomId).emit('gameOver', { winner: result });
                         games.delete(roomId);
                     } else {
-                        game.state = 'speaking';
-                        game.resetVotes();
-                        game.currentRound++;
-                        io.to(roomId).emit('nextRound');
+                        // 游戏继续，开始新一轮
+                        game.startNewRound();
+                        
+                        // 广播新一轮开始
+                        io.to(roomId).emit('roundStart', {
+                            round: game.currentRound,
+                            currentSpeaker: game.currentSpeaker,
+                            eliminatedPlayer: game.lastEliminatedPlayer
+                        });
+                        
+                        // 更新游戏状态
+                        io.to(roomId).emit('gameStateUpdate', game.getGameState());
                     }
                 }
-                
-                io.to(roomId).emit('gameStateUpdate', game.getGameState());
             }
         });
 

@@ -16,6 +16,7 @@ class Game {
             voting: 30           // 投票时限（秒）
         };
         this.timer = null;
+        this.lastEliminatedPlayer = null;  // 记录最后被淘汰的玩家
     }
 
     addPlayer(playerId, username) {
@@ -88,6 +89,11 @@ class Game {
         if (eliminated) {
             const player = this.players.get(eliminated);
             player.isAlive = false;
+            this.lastEliminatedPlayer = {
+                id: eliminated,
+                name: player.name,
+                role: player.role
+            };
         }
 
         return this.checkGameEnd();
@@ -149,7 +155,6 @@ class Game {
     }
 
     getGameState() {
-        // 确保只返回仍在游戏中的玩家
         const activePlayers = Array.from(this.players.values()).map(player => ({
             id: player.id,
             name: player.name,
@@ -158,11 +163,12 @@ class Game {
 
         return {
             state: this.state,
-            players: activePlayers,  // 这里返回最新的玩家列表
+            players: activePlayers,
             hostId: this.hostId,
             currentSpeaker: this.currentSpeaker,
             currentRound: this.currentRound,
-            votes: Array.from(this.votes.entries())
+            votes: Array.from(this.votes.entries()),
+            lastEliminatedPlayer: this.lastEliminatedPlayer
         };
     }
 
@@ -172,6 +178,32 @@ class Game {
             return true;
         }
         return false;
+    }
+
+    // 获取存活玩家数量
+    getAlivePlayersCount() {
+        return Array.from(this.players.values()).filter(p => p.isAlive).length;
+    }
+
+    // 开始新一轮
+    startNewRound() {
+        // 重置投票
+        this.votes.clear();
+        
+        // 更新回合数
+        this.currentRound++;
+        
+        // 重新设置游戏状态为发言阶段
+        this.state = 'speaking';
+        
+        // 更新发言顺序（只包含存活玩家）
+        this.speakingOrder = Array.from(this.players.entries())
+            .filter(([_, player]) => player.isAlive)
+            .map(([id, _]) => id);
+        this.shuffleArray(this.speakingOrder);
+        
+        // 设置第一个发言者
+        this.currentSpeaker = this.speakingOrder[0];
     }
 }
 

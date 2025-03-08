@@ -77,6 +77,22 @@ const Room = ({ roomId }) => {
             setVotes(new Map(newVotes));
         });
 
+        socket.on('roundStart', ({ round, currentSpeaker, eliminatedPlayer }) => {
+            if (eliminatedPlayer) {
+                setMessages(prev => [...prev, {
+                    system: true,
+                    message: `玩家 ${eliminatedPlayer.name} 被投票出局，身份是${eliminatedPlayer.role === 'undercover' ? '卧底' : '平民'}`
+                }]);
+            }
+            
+            setMessages(prev => [...prev, {
+                system: true,
+                message: `第 ${round} 轮开始，请 ${gameState.players.find(p => p.id === currentSpeaker)?.name} 开始发言`
+            }]);
+
+            setVotes(new Map());
+        });
+
         return () => {
             socket.off('gameStateUpdate');
             socket.off('playerJoined');
@@ -87,8 +103,9 @@ const Room = ({ roomId }) => {
             socket.off('newMessage');
             socket.off('playerLeft');
             socket.off('voteUpdated');
+            socket.off('roundStart');
         };
-    }, [socket]);
+    }, [socket, gameState.players]);
 
     const handleStartGame = () => {
         socket.emit('startGame', roomId);
