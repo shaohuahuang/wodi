@@ -1,3 +1,10 @@
+// 使用动态导入 fetch
+let fetch;
+(async () => {
+    const { default: _fetch } = await import('node-fetch');
+    fetch = _fetch;
+})();
+
 class AIPlayer {
     constructor(name, gameState) {
         this.name = name;
@@ -75,9 +82,11 @@ class AIPlayer {
         return prompt;
     }
 
-    // 修改 callAPI 方法以支持流式输出
+    // 修改 callAPI 方法
     async *callAPI(prompt) {
         try {
+            console.log('Calling AI API with prompt:', prompt);  // 调试日志
+            
             const response = await fetch('http://localhost:11434/api/generate', {
                 method: 'POST',
                 headers: {
@@ -86,11 +95,14 @@ class AIPlayer {
                 body: JSON.stringify({
                     model: 'deepseek-r1:8b',
                     prompt: prompt,
-                    stream: true  // 启用流式输出
+                    stream: true
                 })
             });
 
-            // 创建文本解码器
+            if (!response.ok) {
+                throw new Error(`API request failed: ${response.status}`);
+            }
+
             const decoder = new TextDecoder();
             const reader = response.body.getReader();
 
@@ -98,7 +110,6 @@ class AIPlayer {
                 const { value, done } = await reader.read();
                 if (done) break;
                 
-                // 解码响应数据
                 const chunk = decoder.decode(value);
                 const lines = chunk.split('\n');
                 
@@ -107,6 +118,7 @@ class AIPlayer {
                     try {
                         const data = JSON.parse(line);
                         if (data.response) {
+                            console.log('AI response chunk:', data.response);  // 调试日志
                             yield data.response;
                         }
                     } catch (e) {
@@ -120,27 +132,28 @@ class AIPlayer {
         }
     }
 
-    // 修改 generateSpeech 方法以支持流式输出
+    // 修改 generateSpeech 方法
     async *generateSpeech() {
+        console.log('AI player generating speech...');  // 调试日志
         const prompt = this.buildPrompt('speaking');
+        console.log('Generated prompt:', prompt);  // 调试日志
         yield* this.callAPI(prompt);
     }
 
-    // 决定投票
+    // 修改 decideVote 方法
     async decideVote(players) {
+        console.log('AI player deciding vote...');  // 调试日志
         const prompt = this.buildPrompt('voting');
-        const response = await this.callAPI(prompt);
         
-        if (!response) {
-            // API 调用失败时随机选择一个存活的玩家
-            const alivePlayers = players.filter(p => p.isAlive && p.id !== this.id);
-            return alivePlayers[Math.floor(Math.random() * alivePlayers.length)].id;
+        let fullResponse = '';
+        for await (const chunk of this.callAPI(prompt)) {
+            fullResponse += chunk;
         }
+        
+        console.log('AI vote response:', fullResponse);  // 调试日志
 
-        // 分析 AI 的回复，找出要投票的目标
-        // 这里需要进行文本分析，从回复中提取玩家名字
-        // 为简单起见，我们可以让 AI 的回复格式固定，比如以 "我决定投票给 xxx" 结尾
-        const match = response.match(/我决定投票给\s*([^,，。\s]+)/);
+        // 分析响应，找出要投票的目标
+        const match = fullResponse.match(/我决定投票给\s*([^,，。\s]+)/);
         if (match) {
             const targetName = match[1];
             const targetPlayer = players.find(p => 

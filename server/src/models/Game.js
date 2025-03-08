@@ -20,6 +20,9 @@ class Game {
         this.lastEliminatedPlayer = null;  // 记录最后被淘汰的玩家
         this.currentVoter = null;  // 添加当前投票者追踪
         this.aiPlayers = new Map(); // 存储AI玩家
+        this.chatHistory = [];    // 存储所有聊天记录
+        this.voteHistory = [];    // 存储所有投票记录
+        this.roundHistory = [];   // 存储每轮的结果
     }
 
     addPlayer(playerId, username) {
@@ -88,65 +91,18 @@ class Game {
     }
 
     vote(voterId, targetId) {
-        // 检查是否是投票阶段
-        if (this.state !== 'voting') return false;
+        if (!super.vote(voterId, targetId)) return false;
         
-        // 检查是否轮到该玩家投票
-        if (voterId !== this.currentVoter) return false;
-        
-        // 检查投票者是否存活
-        const voter = this.players.get(voterId);
-        if (!voter || !voter.isAlive) return false;
-        
-        // 检查目标玩家是否存活
-        const target = this.players.get(targetId);
-        if (!target || !target.isAlive) return false;
-        
-        this.votes.set(voterId, targetId);
-        
-        // 更新 AI 玩家的投票历史
-        this.aiPlayers.forEach(ai => {
-            ai.addVoteHistory(Array.from(this.votes.entries()));
-        });
-        
-        // 更新下一个投票者
-        this.currentVoter = this.getNextVoter();
-        
+        this.addVoteRecord(voterId, targetId);
         return true;
     }
 
     calculateVoteResult() {
-        const voteCount = new Map();
-        this.votes.forEach((targetId) => {
-            voteCount.set(targetId, (voteCount.get(targetId) || 0) + 1);
-        });
-
-        let maxVotes = 0;
-        let eliminated = null;
-        
-        voteCount.forEach((count, playerId) => {
-            if (count > maxVotes) {
-                maxVotes = count;
-                eliminated = playerId;
-            }
-        });
-
+        const eliminated = super.calculateVoteResult();
         if (eliminated) {
-            const player = this.players.get(eliminated);
-            player.isAlive = false;
-            this.lastEliminatedPlayer = {
-                id: eliminated,
-                name: player.name,
-                role: player.role
-            };
-
-            // 通知所有 AI 玩家有玩家被淘汰
-            this.aiPlayers.forEach(ai => {
-                ai.addEliminatedPlayer(this.lastEliminatedPlayer);
-            });
+            this.addRoundResult(eliminated);
         }
-
-        return this.checkGameEnd();
+        return eliminated;
     }
 
     checkGameEnd() {
@@ -332,6 +288,17 @@ class Game {
             player.word = null;
             player.isAlive = true;
         });
+
+        this.chatHistory = [];
+        this.voteHistory = [];
+        this.roundHistory = [];
+        
+        // 重置所有AI玩家的历史记录
+        this.aiPlayers.forEach(ai => {
+            ai.chatHistory = [];
+            ai.voteHistory = [];
+            ai.eliminatedPlayers = [];
+        });
     }
 
     // 当收到消息时更新AI的历史记录
@@ -395,6 +362,53 @@ class Game {
         }
         
         return true;
+    }
+
+    // 添加聊天记录
+    addChatMessage(message) {
+        this.chatHistory.push(message);
+        // 同时更新所有AI玩家的历史记录
+        this.aiPlayers.forEach(ai => {
+            ai.addToHistory(message);
+        });
+    }
+
+    // 添加投票记录
+    addVoteRecord(voterId, targetId) {
+        const voter = this.players.get(voterId);
+        const target = this.players.get(targetId);
+        const voteRecord = {
+            round: this.currentRound,
+            voter: voter.name,
+            target: target.name,
+            timestamp: Date.now()
+        };
+        this.voteHistory.push(voteRecord);
+    }
+
+    // 记录每轮结果
+    addRoundResult(eliminatedPlayer = null) {
+        const roundResult = {
+            round: this.currentRound,
+            eliminated: eliminatedPlayer ? {
+                name: eliminatedPlayer.name,
+                role: eliminatedPlayer.role
+            } : null,
+            votes: Array.from(this.votes.entries()).map(([voterId, targetId]) => ({
+                voter: this.players.get(voterId).name,
+                target: this.players.get(targetId).name
+            }))
+        };
+        this.roundHistory.push(roundResult);
+    }
+
+    // 获取完整的游戏历史
+    getGameHistory() {
+        return {
+            chatHistory: this.chatHistory,
+            voteHistory: this.voteHistory,
+            roundHistory: this.roundHistory
+        };
     }
 }
 
