@@ -286,7 +286,54 @@ function handleGameEvents(io) {
             // 更新房间列表
             broadcastRoomsList();
         });
+
+        // 添加AI玩家
+        socket.on('addAIPlayer', ({ roomId, aiName }) => {
+            const game = games.get(roomId);
+            if (!game || game.hostId !== socket.id) return;
+
+            const aiId = game.addAIPlayer(aiName);
+            io.to(roomId).emit('gameStateUpdate', game.getGameState());
+            
+            // 处理AI的自动行为
+            handleAIActions(game, io, roomId);
+        });
     });
+
+    // 处理AI的行为
+    function handleAIActions(game, io, roomId) {
+        const aiAction = game.handleAITurn();
+        if (!aiAction) return;
+
+        if (aiAction.type === 'speech') {
+            // 发送AI的发言
+            io.to(roomId).emit('newMessage', {
+                playerId: aiAction.playerId,
+                playerName: game.players.get(aiAction.playerId).name,
+                message: aiAction.content
+            });
+            
+            // 延迟后结束发言
+            setTimeout(() => {
+                game.finishSpeaking(aiAction.playerId);
+                io.to(roomId).emit('gameStateUpdate', game.getGameState());
+                handleAIActions(game, io, roomId);
+            }, 5000); // 5秒后结束发言
+        }
+        
+        if (aiAction.type === 'vote') {
+            // 处理AI的投票
+            if (game.vote(aiAction.playerId, aiAction.targetId)) {
+                io.to(roomId).emit('voteUpdated', {
+                    votes: Array.from(game.votes.entries()),
+                    nextVoter: game.currentVoter
+                });
+                
+                // 继续处理下一个AI的行为
+                handleAIActions(game, io, roomId);
+            }
+        }
+    }
 
     // 当服务器关闭时清理定时器
     return () => {

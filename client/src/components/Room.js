@@ -199,6 +199,13 @@ const Room = ({ roomId }) => {
         }, 100);
     };
 
+    const handleAddAI = () => {
+        if (gameState.hostId === socket?.id) {
+            const aiName = `AI玩家${gameState.players.length + 1}`;
+            socket.emit('addAIPlayer', { roomId, aiName });
+        }
+    };
+
     const renderMessage = (msg, index) => {
         if (msg.system) {
             return (
@@ -350,6 +357,12 @@ const Room = ({ roomId }) => {
                     className="finish-speaking-button"
                 >
                     结束发言
+                </button>
+            )}
+
+            {gameState.currentPhase === 'waiting' && gameState.hostId === socket?.id && (
+                <button onClick={handleAddAI} className="add-ai-button">
+                    添加AI玩家
                 </button>
             )}
 

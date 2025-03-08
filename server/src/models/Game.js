@@ -1,4 +1,5 @@
 const { getRandomWordPair } = require('./wordPairs');
+const AIPlayer = require('./AIPlayer');
 
 class Game {
     constructor(roomId, hostId) {
@@ -18,6 +19,7 @@ class Game {
         this.timer = null;
         this.lastEliminatedPlayer = null;  // 记录最后被淘汰的玩家
         this.currentVoter = null;  // 添加当前投票者追踪
+        this.aiPlayers = new Map(); // 存储AI玩家
     }
 
     addPlayer(playerId, username) {
@@ -30,6 +32,21 @@ class Game {
         });
     }
 
+    addAIPlayer(name) {
+        const aiPlayer = new AIPlayer(name, this.getGameState());
+        const aiId = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        this.players.set(aiId, {
+            id: aiId,
+            name: name,
+            role: null,
+            isAlive: true,
+            word: null,
+            isAI: true
+        });
+        this.aiPlayers.set(aiId, aiPlayer);
+        return aiId;
+    }
+
     startGame() {
         if (this.players.size < 4) return false;
         
@@ -40,6 +57,13 @@ class Game {
         this.shuffleArray(this.speakingOrder);
         this.state = 'speaking';
         this.currentSpeaker = this.speakingOrder[0];
+        
+        this.aiPlayers.forEach((ai, aiId) => {
+            const player = this.players.get(aiId);
+            ai.role = player.role;
+            ai.word = player.word;
+            ai.updateGameState(this.getGameState());
+        });
         
         return true;
     }
@@ -80,6 +104,11 @@ class Game {
         
         this.votes.set(voterId, targetId);
         
+        // 更新 AI 玩家的投票历史
+        this.aiPlayers.forEach(ai => {
+            ai.addVoteHistory(Array.from(this.votes.entries()));
+        });
+        
         // 更新下一个投票者
         this.currentVoter = this.getNextVoter();
         
@@ -110,6 +139,11 @@ class Game {
                 name: player.name,
                 role: player.role
             };
+
+            // 通知所有 AI 玩家有玩家被淘汰
+            this.aiPlayers.forEach(ai => {
+                ai.addEliminatedPlayer(this.lastEliminatedPlayer);
+            });
         }
 
         return this.checkGameEnd();
@@ -298,6 +332,48 @@ class Game {
             player.word = null;
             player.isAlive = true;
         });
+    }
+
+    // 当收到消息时更新AI的历史记录
+    updateAIHistory(message) {
+        this.aiPlayers.forEach(ai => {
+            ai.addToHistory(message);
+        });
+    }
+
+    // 处理AI的自动行为
+    handleAITurn() {
+        if (this.state === 'speaking' && this.isCurrentPlayerAI()) {
+            const aiPlayer = this.aiPlayers.get(this.currentSpeaker);
+            const speech = aiPlayer.generateSpeech();
+            return {
+                type: 'speech',
+                playerId: this.currentSpeaker,
+                content: speech
+            };
+        }
+        
+        if (this.state === 'voting' && this.isCurrentVoterAI()) {
+            const aiPlayer = this.aiPlayers.get(this.currentVoter);
+            const alivePlayers = Array.from(this.players.values())
+                .filter(p => p.isAlive && p.id !== this.currentVoter);
+            const targetId = aiPlayer.decideVote(alivePlayers);
+            return {
+                type: 'vote',
+                playerId: this.currentVoter,
+                targetId: targetId
+            };
+        }
+        
+        return null;
+    }
+
+    isCurrentPlayerAI() {
+        return this.currentSpeaker && this.aiPlayers.has(this.currentSpeaker);
+    }
+
+    isCurrentVoterAI() {
+        return this.currentVoter && this.aiPlayers.has(this.currentVoter);
     }
 }
 
