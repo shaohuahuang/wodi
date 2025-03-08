@@ -164,9 +164,10 @@ function handleGameEvents(io) {
                 if (!game.currentVoter) {
                     const result = game.calculateVoteResult();
                     if (result) {
-                        // 游戏结束
-                        io.to(roomId).emit('gameOver', { winner: result });
-                        games.delete(roomId);
+                        // 游戏结束，广播结果
+                        io.to(roomId).emit('gameOver', result);
+                        // 广播更新后的游戏状态
+                        io.to(roomId).emit('gameStateUpdate', game.getGameState());
                     } else {
                         // 游戏继续，开始新一轮
                         game.startNewRound();

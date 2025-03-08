@@ -136,26 +136,26 @@ class Game {
             }
         });
 
-        // 卧底全部出局，平民胜利
-        if (aliveUndercovers === 0) {
-            this.state = 'ended';
-            return {
-                winner: 'civilians',
-                message: '所有卧底已被找出，平民胜利！',
-                civilians: civilians,
-                undercovers: undercovers
-            };
-        }
-        
-        // 场上平民只剩一人，而卧底还在，卧底胜利
-        if (aliveCivilians <= 1 && aliveUndercovers > 0) {
-            this.state = 'ended';
-            return {
-                winner: 'undercovers',
-                message: '平民人数不足，卧底胜利！',
-                civilians: civilians,
-                undercovers: undercovers
-            };
+        // 卧底全部出局或平民只剩一人时，游戏结束
+        if (aliveUndercovers === 0 || (aliveCivilians <= 1 && aliveUndercovers > 0)) {
+            // 重置游戏状态
+            this.resetGameState();
+            
+            if (aliveUndercovers === 0) {
+                return {
+                    winner: 'civilians',
+                    message: '所有卧底已被找出，平民胜利！',
+                    civilians,
+                    undercovers
+                };
+            } else {
+                return {
+                    winner: 'undercovers',
+                    message: '平民人数不足，卧底胜利！',
+                    civilians,
+                    undercovers
+                };
+            }
         }
 
         // 游戏继续
@@ -279,6 +279,25 @@ class Game {
             nextIndex--;
         }
         return null;  // 所有人都投票完了
+    }
+
+    // 添加重置游戏状态的方法
+    resetGameState() {
+        this.state = 'waiting';
+        this.currentRound = 0;
+        this.currentSpeaker = null;
+        this.currentVoter = null;
+        this.votes.clear();
+        this.words = getRandomWordPair();
+        this.speakingOrder = [];
+        this.lastEliminatedPlayer = null;
+        
+        // 重置所有玩家状态
+        this.players.forEach(player => {
+            player.role = null;
+            player.word = null;
+            player.isAlive = true;
+        });
     }
 }
 
