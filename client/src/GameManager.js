@@ -581,9 +581,14 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
 
         // 清空消息历史
         this.messages = [];
-
+        
         // 通知状态更新
         this.notifyGameStateUpdate();
+        
+        // 通知消息更新（清空聊天框）
+        if (this.onNewMessage) {
+            this.onNewMessage({ clear: true });
+        }
 
         // 添加系统消息
         const message = {

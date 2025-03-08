@@ -28,7 +28,14 @@ const Room = ({ gameManager, username }) => {
     useEffect(() => {
         // 设置事件处理器
         gameManager.onGameStateUpdate = setGameState;
-        gameManager.onNewMessage = (msg) => setMessages(prev => [...prev, msg]);
+        gameManager.onNewMessage = (msg) => {
+            if (msg.clear) {
+                // 如果收到清空消息的信号，清空消息列表
+                setMessages([]);
+            } else {
+                setMessages(prev => [...prev, msg]);
+            }
+        };
         gameManager.onGameOver = (result) => {
             setGameState(prev => ({ ...prev, currentPhase: 'ended', winner: result.winner }));
             setMessages(prev => [...prev, 
