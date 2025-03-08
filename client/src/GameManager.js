@@ -112,42 +112,119 @@ class GameManager {
         return true;
     }
 
-    // 添加处理AI行为的方法
+    // 调用大模型接口
+    async callLLM(prompt, onChunk) {
+        try {
+            const response = await fetch('http://localhost:3001/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ prompt })
+            });
+
+            if (!response.ok) {
+                throw new Error('API调用失败');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullMessage = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value);
+                fullMessage += chunk;
+                onChunk(chunk);
+            }
+
+            return fullMessage;
+        } catch (error) {
+            console.error('调用大模型接口出错:', error);
+            return '对不起，我现在有点混乱...';
+        }
+    }
+
+    // 修改AI行为处理方法
     async handleAIActions() {
-        // 获取当前AI玩家
         const currentPlayer = this.gameState.players.find(p => 
             p.id === this.gameState.currentSpeaker && p.id !== 'host'
         );
 
         if (!currentPlayer) return;
 
-        // 模拟AI发言
-        const aiMessage = `我是${currentPlayer.name}，我觉得这个词是...`;
+        // 构建提示词
+        const prompt = this.buildAIPrompt(currentPlayer);
         
-        // 逐字显示AI发言
-        for (let i = 0; i < aiMessage.length; i++) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            this.notifyAISpeaking({
+        try {
+            // 逐字输出AI的发言
+            const fullMessage = await this.callLLM(prompt, (chunk) => {
+                this.notifyAISpeaking({
+                    playerId: currentPlayer.id,
+                    playerName: currentPlayer.name,
+                    message: chunk,
+                    isComplete: false
+                });
+            });
+
+            // 发送完整消息
+            const chatMessage = {
                 playerId: currentPlayer.id,
                 playerName: currentPlayer.name,
-                message: aiMessage.slice(0, i + 1),
-                isComplete: i === aiMessage.length - 1
-            });
+                message: fullMessage,
+                timestamp: Date.now()
+            };
+            this.notifyNewMessage(chatMessage);
+
+            // 延迟后结束AI发言
+            setTimeout(() => {
+                this.finishSpeaking(currentPlayer.id);
+            }, 1000);
+        } catch (error) {
+            console.error('AI发言出错:', error);
+            const errorMessage = {
+                playerId: currentPlayer.id,
+                playerName: currentPlayer.name,
+                message: '对不起，我现在有点混乱...',
+                timestamp: Date.now()
+            };
+            this.notifyNewMessage(errorMessage);
+            
+            // 即使出错也要继续游戏
+            setTimeout(() => {
+                this.finishSpeaking(currentPlayer.id);
+            }, 1000);
         }
+    }
 
-        // 发送完整消息
-        const chatMessage = {
-            playerId: currentPlayer.id,
-            playerName: currentPlayer.name,
-            message: aiMessage,
-            timestamp: Date.now()
+    // 构建AI提示词
+    buildAIPrompt(currentPlayer) {
+        const gameInfo = {
+            currentRound: this.gameState.currentRound,
+            totalPlayers: this.gameState.players.length,
+            myWord: currentPlayer.word,
+            myRole: currentPlayer.role,
+            previousSpeeches: this.messages.filter(m => m.type === 'speech').map(m => ({
+                playerName: m.playerName,
+                content: m.message
+            }))
         };
-        this.notifyNewMessage(chatMessage);
 
-        // 延迟后结束AI发言
-        setTimeout(() => {
-            this.finishSpeaking(currentPlayer.id);
-        }, 1000);
+        return `你是一个在玩谁是卧底游戏的AI玩家，你的名字是${currentPlayer.name}。
+当前是第${gameInfo.currentRound}轮，共有${gameInfo.totalPlayers}名玩家。
+你的词语是"${currentPlayer.word}"，你的身份是${currentPlayer.role === 'undercover' ? '卧底' : '平民'}。
+
+游戏规则：
+1. 如果你是平民，要描述你的词语，但不能直接说出这个词
+2. 如果你是卧底，要假装描述平民的词语，误导其他玩家
+3. 发言要自然，不要太明显暴露自己的身份
+
+之前的发言记录：
+${gameInfo.previousSpeeches.map(s => `${s.playerName}: ${s.content}`).join('\n')}
+
+请根据你的角色和词语进行一次发言：`;
     }
 
     // 修改结束发言方法
