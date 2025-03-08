@@ -267,19 +267,21 @@ class GameManager {
                 }))
         };
 
-        return `你是一个在玩谁是卧底游戏的AI玩家，你的名字是${currentPlayer.name}。
-当前是第${gameInfo.currentRound}轮，共有${gameInfo.totalPlayers}名玩家。
-你的词语是"${currentPlayer.word}"，你的身份是${currentPlayer.role === 'undercover' ? '卧底' : '平民'}。
+        return `你正在参与一个谁是卧底游戏，你需要扮演一个普通的游戏玩家"${currentPlayer.name}"。
+你的词语是"${currentPlayer.word}"，身份是${currentPlayer.role === 'undercover' ? '卧底' : '平民'}。
 
-游戏规则：
-1. 如果你是平民，要描述你的词语，但不能直接说出这个词
-2. 如果你是卧底，要假装描述平民的词语，误导其他玩家
-3. 发言要自然，不要太明显暴露自己的身份
+要求：
+1. 你的回答要像一个真实的玩家，不要用太书面或机械的语言
+2. 描述要含糊但合理，不要太明显地暴露或掩饰自己的身份
+3. 要参考之前玩家的发言，保持描述的连贯性
+4. 发言要简短自然，控制在30个字以内
+5. 如果是平民，要巧妙地描述自己的词语，但绝对不能直接说出来
+6. 如果是卧底，要假装理解了大家在说什么，适当地跟随和误导
 
-之前的发言记录：
+之前的发言：
 ${gameInfo.previousSpeeches.map(s => `${s.playerName}: ${s.content}`).join('\n')}
 
-请根据你的角色和词语进行一次发言：`;
+请直接给出你的发言内容，不要有任何解释或推理过程。`;
     }
 
     // 修改结束发言方法
