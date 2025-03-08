@@ -8,6 +8,16 @@ class GameManager {
         this.onVoteUpdate = null;
         this.onRoundStart = null;
         this.onAISpeaking = null;
+        this.messages = [];  // 添加消息历史记录
+        this.gameState = {
+            players: [],
+            currentPhase: 'waiting',
+            myRole: null,
+            myWord: null,
+            currentSpeaker: null,
+            currentVoter: null,
+            hostId: 'host'
+        };
     }
 
     // 创建新游戏
@@ -115,12 +125,16 @@ class GameManager {
     // 调用大模型接口
     async callLLM(prompt, onChunk) {
         try {
-            const response = await fetch('http://localhost:3001/api/chat', {
+            const response = await fetch('http://localhost:11434/api/generate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ prompt })
+                body: JSON.stringify({
+                    model: "deepseek-r1:8b",
+                    prompt: prompt,
+                    stream: true
+                })
             });
 
             if (!response.ok) {
@@ -136,8 +150,20 @@ class GameManager {
                 if (done) break;
                 
                 const chunk = decoder.decode(value);
-                fullMessage += chunk;
-                onChunk(chunk);
+                // Ollama 返回的是换行分隔的 JSON 字符串
+                const lines = chunk.split('\n').filter(line => line.trim());
+                
+                for (const line of lines) {
+                    try {
+                        const data = JSON.parse(line);
+                        if (data.response) {
+                            fullMessage += data.response;
+                            onChunk(data.response);
+                        }
+                    } catch (e) {
+                        console.error('解析响应出错:', e);
+                    }
+                }
             }
 
             return fullMessage;
@@ -174,8 +200,10 @@ class GameManager {
                 playerId: currentPlayer.id,
                 playerName: currentPlayer.name,
                 message: fullMessage,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                type: 'speech'  // 添加消息类型
             };
+            this.messages.push(chatMessage);  // 添加到历史记录
             this.notifyNewMessage(chatMessage);
 
             // 延迟后结束AI发言
@@ -190,6 +218,7 @@ class GameManager {
                 message: '对不起，我现在有点混乱...',
                 timestamp: Date.now()
             };
+            this.messages.push(errorMessage);  // 添加到历史记录
             this.notifyNewMessage(errorMessage);
             
             // 即使出错也要继续游戏
@@ -206,10 +235,12 @@ class GameManager {
             totalPlayers: this.gameState.players.length,
             myWord: currentPlayer.word,
             myRole: currentPlayer.role,
-            previousSpeeches: this.messages.filter(m => m.type === 'speech').map(m => ({
-                playerName: m.playerName,
-                content: m.message
-            }))
+            previousSpeeches: this.messages
+                .filter(m => m.type === 'speech')
+                .map(m => ({
+                    playerName: m.playerName,
+                    content: m.message
+                }))
         };
 
         return `你是一个在玩谁是卧底游戏的AI玩家，你的名字是${currentPlayer.name}。
@@ -277,8 +308,10 @@ ${gameInfo.previousSpeeches.map(s => `${s.playerName}: ${s.content}`).join('\n')
             playerId: 'host',
             playerName: this.gameState.players[0].name,
             message,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            type: 'speech'  // 添加消息类型
         };
+        this.messages.push(chatMessage);  // 添加到历史记录
         this.notifyNewMessage(chatMessage);
     }
 
