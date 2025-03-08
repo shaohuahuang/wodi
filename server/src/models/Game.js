@@ -118,7 +118,17 @@ class Game {
     checkGameEnd() {
         let aliveCivilians = 0;
         let aliveUndercovers = 0;
+        
+        // 获取所有平民和卧底的名字
+        const civilians = Array.from(this.players.values())
+            .filter(p => p.role === 'civilian')
+            .map(p => p.name);
+        
+        const undercovers = Array.from(this.players.values())
+            .filter(p => p.role === 'undercover')
+            .map(p => p.name);
 
+        // 计算存活人数
         this.players.forEach(player => {
             if (player.isAlive) {
                 if (player.role === 'civilian') aliveCivilians++;
@@ -126,8 +136,29 @@ class Game {
             }
         });
 
-        if (aliveUndercovers === 0) return 'civilians';
-        if (aliveUndercovers >= aliveCivilians) return 'undercovers';
+        // 卧底全部出局，平民胜利
+        if (aliveUndercovers === 0) {
+            this.state = 'ended';
+            return {
+                winner: 'civilians',
+                message: '所有卧底已被找出，平民胜利！',
+                civilians: civilians,
+                undercovers: undercovers
+            };
+        }
+        
+        // 场上平民只剩一人，而卧底还在，卧底胜利
+        if (aliveCivilians <= 1 && aliveUndercovers > 0) {
+            this.state = 'ended';
+            return {
+                winner: 'undercovers',
+                message: '平民人数不足，卧底胜利！',
+                civilians: civilians,
+                undercovers: undercovers
+            };
+        }
+
+        // 游戏继续
         return null;
     }
 

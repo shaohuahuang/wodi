@@ -378,4 +378,32 @@
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.game-over {
+    background-color: #f5f5f5;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+    text-align: center;
+    animation: fadeIn 0.5s ease;
+}
+
+.game-result {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #2196F3;
+}
+
+.game-stats {
+    background-color: white;
+    padding: 15px;
+    border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.game-stats p {
+    margin: 8px 0;
+    color: #333;
 } 

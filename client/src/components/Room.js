@@ -54,8 +54,18 @@ const Room = ({ roomId }) => {
             setGameState(prev => ({ ...prev, currentPhase: 'voting' }));
         });
 
-        socket.on('gameOver', ({ winner }) => {
+        socket.on('gameOver', ({ winner, message, civilians, undercovers }) => {
             setGameState(prev => ({ ...prev, currentPhase: 'ended', winner }));
+            setMessages(prev => [...prev, {
+                system: true,
+                message: message
+            }, {
+                system: true,
+                message: `平民: ${civilians.join(', ')}`
+            }, {
+                system: true,
+                message: `卧底: ${undercovers.join(', ')}`
+            }]);
         });
 
         socket.on('newMessage', (message) => {
@@ -357,6 +367,19 @@ const Room = ({ roomId }) => {
                     <button type="submit">发送</button>
                 </form>
             </div>
+
+            {gameState.currentPhase === 'ended' && (
+                <div className="game-over">
+                    <h3 className="game-result">
+                        {gameState.winner === 'civilians' ? '平民胜利！' : '卧底胜利！'}
+                    </h3>
+                    <div className="game-stats">
+                        <p>游戏结束！</p>
+                        <p>你的身份是: {gameState.myRole === 'undercover' ? '卧底' : '平民'}</p>
+                        <p>你的词语是: {gameState.myWord}</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
