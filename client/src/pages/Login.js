@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSocket } from '../context/SocketContext';
 import '../styles/Login.css';
 
 const Login = () => {
     const navigate = useNavigate();
+    const socket = useSocket();
     const [username, setUsername] = useState('');
     const [error, setError] = useState('');
 
@@ -11,9 +13,13 @@ const Login = () => {
         // 如果已经登录，直接跳转到首页
         const loggedInUser = localStorage.getItem('username');
         if (loggedInUser) {
+            // 如果已登录，先请求房间列表再跳转
+            if (socket) {
+                socket.emit('getRoomsList');
+            }
             navigate('/');
         }
-    }, [navigate]);
+    }, [navigate, socket]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -24,6 +30,12 @@ const Login = () => {
 
         // 存储用户名
         localStorage.setItem('username', username.trim());
+        
+        // 登录成功后，先请求房间列表再跳转
+        if (socket) {
+            socket.emit('getRoomsList');
+        }
+        
         navigate('/');
     };
 
