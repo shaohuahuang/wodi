@@ -145,6 +145,33 @@ const Room = ({ roomId }) => {
             setVotes(new Map());
         });
 
+        // 添加AI发言的实时显示
+        socket.on('aiSpeaking', ({ playerId, playerName, message, isComplete }) => {
+            if (!isComplete) {
+                // 更新最后一条消息或添加新消息
+                setMessages(prev => {
+                    const lastMessage = prev[prev.length - 1];
+                    if (lastMessage && lastMessage.playerId === playerId && !lastMessage.isComplete) {
+                        // 更新最后一条消息
+                        const newMessages = [...prev];
+                        newMessages[newMessages.length - 1] = {
+                            ...lastMessage,
+                            message: lastMessage.message + message
+                        };
+                        return newMessages;
+                    } else {
+                        // 添加新消息
+                        return [...prev, {
+                            playerId,
+                            playerName,
+                            message,
+                            isComplete: false
+                        }];
+                    }
+                });
+            }
+        });
+
         return () => {
             socket.off('gameStateUpdate');
             socket.off('playerJoined');
@@ -156,6 +183,7 @@ const Room = ({ roomId }) => {
             socket.off('playerLeft');
             socket.off('voteUpdated');
             socket.off('roundStart');
+            socket.off('aiSpeaking');
         };
     }, [socket, gameState.players]);
 

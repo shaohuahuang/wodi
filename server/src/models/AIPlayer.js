@@ -75,8 +75,8 @@ class AIPlayer {
         return prompt;
     }
 
-    // 调用 API 获取回复
-    async callAPI(prompt) {
+    // 修改 callAPI 方法以支持流式输出
+    async *callAPI(prompt) {
         try {
             const response = await fetch('http://localhost:11434/api/generate', {
                 method: 'POST',
@@ -86,23 +86,44 @@ class AIPlayer {
                 body: JSON.stringify({
                     model: 'deepseek-r1:8b',
                     prompt: prompt,
-                    stream: false
+                    stream: true  // 启用流式输出
                 })
             });
 
-            const data = await response.json();
-            return data.response;
+            // 创建文本解码器
+            const decoder = new TextDecoder();
+            const reader = response.body.getReader();
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                
+                // 解码响应数据
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const data = JSON.parse(line);
+                        if (data.response) {
+                            yield data.response;
+                        }
+                    } catch (e) {
+                        console.error('解析响应数据失败:', e);
+                    }
+                }
+            }
         } catch (error) {
             console.error('调用 AI API 失败:', error);
-            return null;
+            yield '我需要思考一下...';
         }
     }
 
-    // 生成发言内容
-    async generateSpeech() {
+    // 修改 generateSpeech 方法以支持流式输出
+    async *generateSpeech() {
         const prompt = this.buildPrompt('speaking');
-        const response = await this.callAPI(prompt);
-        return response || '我需要思考一下...';  // 如果 API 调用失败，返回默认消息
+        yield* this.callAPI(prompt);
     }
 
     // 决定投票

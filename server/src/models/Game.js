@@ -342,14 +342,16 @@ class Game {
     }
 
     // 处理AI的自动行为
-    handleAITurn() {
+    async handleAITurn() {
+        // 检查是否是AI的回合
         if (this.state === 'speaking' && this.isCurrentPlayerAI()) {
             const aiPlayer = this.aiPlayers.get(this.currentSpeaker);
-            const speech = aiPlayer.generateSpeech();
+            if (!aiPlayer) return null;
+
             return {
                 type: 'speech',
                 playerId: this.currentSpeaker,
-                content: speech
+                aiPlayer: aiPlayer  // 返回AI玩家实例，而不是直接生成内容
             };
         }
         
@@ -357,7 +359,7 @@ class Game {
             const aiPlayer = this.aiPlayers.get(this.currentVoter);
             const alivePlayers = Array.from(this.players.values())
                 .filter(p => p.isAlive && p.id !== this.currentVoter);
-            const targetId = aiPlayer.decideVote(alivePlayers);
+            const targetId = await aiPlayer.decideVote(alivePlayers);
             return {
                 type: 'vote',
                 playerId: this.currentVoter,
@@ -374,6 +376,25 @@ class Game {
 
     isCurrentVoterAI() {
         return this.currentVoter && this.aiPlayers.has(this.currentVoter);
+    }
+
+    finishSpeaking(playerId) {
+        if (this.currentSpeaker !== playerId) return false;
+
+        const currentIndex = this.speakingOrder.indexOf(this.currentSpeaker);
+        const nextIndex = (currentIndex + 1) % this.speakingOrder.length;
+        
+        if (nextIndex === 0) {
+            // 开始投票阶段
+            this.state = 'voting';
+            this.votes.clear();
+            // 设置第一个投票者（使用发言顺序的反向）
+            this.currentVoter = this.speakingOrder[this.speakingOrder.length - 1];
+        } else {
+            this.currentSpeaker = this.speakingOrder[nextIndex];
+        }
+        
+        return true;
     }
 }
 

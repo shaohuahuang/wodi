@@ -125,6 +125,9 @@ function handleGameEvents(io) {
                     });
                 });
                 io.to(roomId).emit('gameStateUpdate', game.getGameState());
+
+                // 在游戏开始后开始处理AI行为
+                handleAIActions(game, io, roomId);
             }
         });
 
@@ -294,31 +297,92 @@ function handleGameEvents(io) {
 
             const aiId = game.addAIPlayer(aiName);
             io.to(roomId).emit('gameStateUpdate', game.getGameState());
-            
-            // 处理AI的自动行为
-            handleAIActions(game, io, roomId);
         });
     });
 
     // 处理AI的行为
-    function handleAIActions(game, io, roomId) {
-        const aiAction = game.handleAITurn();
+    async function handleAIActions(game, io, roomId) {
+        const aiAction = await game.handleAITurn();  // 确保等待异步操作完成
         if (!aiAction) return;
 
         if (aiAction.type === 'speech') {
-            // 发送AI的发言
-            io.to(roomId).emit('newMessage', {
-                playerId: aiAction.playerId,
-                playerName: game.players.get(aiAction.playerId).name,
-                message: aiAction.content
-            });
-            
-            // 延迟后结束发言
-            setTimeout(() => {
-                game.finishSpeaking(aiAction.playerId);
-                io.to(roomId).emit('gameStateUpdate', game.getGameState());
-                handleAIActions(game, io, roomId);
-            }, 5000); // 5秒后结束发言
+            const aiPlayer = aiAction.aiPlayer;
+            const playerName = game.players.get(aiAction.playerId).name;
+
+            console.log(`AI player ${playerName} is speaking...`);
+
+            // 开始流式输出AI的发言
+            let fullMessage = '';
+            try {
+                // 使用 for await...of 来处理生成器
+                for await (const chunk of aiPlayer.generateSpeech()) {
+                    fullMessage += chunk;
+                    
+                    // 发送部分消息到聊天框
+                    io.to(roomId).emit('aiSpeaking', {
+                        playerId: aiAction.playerId,
+                        playerName: playerName,
+                        message: chunk,
+                        isComplete: false
+                    });
+
+                    // 添加一个小延迟，模拟打字效果
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+
+                console.log(`AI player ${playerName} finished speaking: ${fullMessage}`);
+
+                // 发送完整消息到聊天记录
+                io.to(roomId).emit('newMessage', {
+                    playerId: aiAction.playerId,
+                    playerName: playerName,
+                    message: fullMessage
+                });
+
+                // 更新AI的聊天历史
+                game.updateAIHistory({
+                    playerId: aiAction.playerId,
+                    playerName: playerName,
+                    message: fullMessage
+                });
+
+                // 延迟后结束发言，进入下一个玩家
+                setTimeout(() => {
+                    if (game.finishSpeaking(aiAction.playerId)) {
+                        // 广播游戏状态更新
+                        io.to(roomId).emit('gameStateUpdate', game.getGameState());
+                        
+                        if (game.state === 'voting') {
+                            // 如果进入投票阶段
+                            io.to(roomId).emit('votingStart');
+                        } else {
+                            // 广播下一个发言者
+                            io.to(roomId).emit('nextSpeaker', { 
+                                speakerId: game.currentSpeaker 
+                            });
+                        }
+                        
+                        // 继续处理下一个AI行为
+                        handleAIActions(game, io, roomId);
+                    }
+                }, 1000);
+
+            } catch (error) {
+                console.error('AI发言出错:', error);
+                // 发生错误时发送默认消息
+                io.to(roomId).emit('newMessage', {
+                    playerId: aiAction.playerId,
+                    playerName: playerName,
+                    message: '对不起，我现在有点混乱...'
+                });
+                
+                // 即使出错也要继续游戏
+                setTimeout(() => {
+                    game.finishSpeaking(aiAction.playerId);
+                    io.to(roomId).emit('gameStateUpdate', game.getGameState());
+                    handleAIActions(game, io, roomId);
+                }, 1000);
+            }
         }
         
         if (aiAction.type === 'vote') {
