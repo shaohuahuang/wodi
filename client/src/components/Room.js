@@ -83,7 +83,9 @@ const Room = ({ gameManager, username }) => {
     };
 
     const handleFinishSpeaking = () => {
-        gameManager.finishSpeaking();
+        if (gameState.currentSpeaker === 'host') {
+            gameManager.finishSpeaking('host');
+        }
     };
 
     const handleVote = (targetId) => {

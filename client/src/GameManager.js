@@ -229,26 +229,40 @@ ${gameInfo.previousSpeeches.map(s => `${s.playerName}: ${s.content}`).join('\n')
 
     // 修改结束发言方法
     finishSpeaking(playerId) {
-        if (this.gameState.currentSpeaker !== playerId) return;
+        console.log('Finishing speech for player:', playerId); // 调试日志
 
+        // 检查是否是当前发言者
+        if (this.gameState.currentSpeaker !== playerId) {
+            console.log('Not current speaker:', playerId);
+            return;
+        }
+
+        // 获取下一个发言者
         const currentIndex = this.gameState.speakingOrder.indexOf(playerId);
         const nextIndex = (currentIndex + 1) % this.gameState.speakingOrder.length;
+        console.log('Current index:', currentIndex, 'Next index:', nextIndex);
 
         if (nextIndex === 0) {
             // 一轮发言结束，进入投票阶段
             this.gameState.currentPhase = 'voting';
             this.gameState.currentVoter = this.gameState.speakingOrder[this.gameState.speakingOrder.length - 1];
             this.gameState.votes = new Map();
+            console.log('Round finished, entering voting phase');
         } else {
             // 下一个玩家发言
             this.gameState.currentSpeaker = this.gameState.speakingOrder[nextIndex];
+            console.log('Next speaker:', this.gameState.currentSpeaker);
         }
 
+        // 更新游戏状态
         this.notifyGameStateUpdate();
 
         // 如果下一个是AI玩家，自动开始AI行为
         if (this.gameState.currentSpeaker !== 'host' && this.gameState.currentPhase === 'speaking') {
-            this.handleAIActions();
+            console.log('Starting AI actions for next speaker');
+            setTimeout(() => {
+                this.handleAIActions();
+            }, 1000); // 给一个短暂的延迟，让UI有时间更新
         }
     }
 
