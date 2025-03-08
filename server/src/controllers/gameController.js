@@ -1,0 +1,166 @@
+const Game = require('../models/Game');
+const games = new Map();
+
+function handleGameEvents(io) {
+    io.on('connection', (socket) => {
+        console.log('New client connected:', socket.id);
+
+        // 创建房间
+        socket.on('createRoom', (playerName) => {
+            const roomId = generateRoomId();
+            const game = new Game(roomId);
+            game.addPlayer(socket.id, playerName);
+            games.set(roomId, game);
+            
+            socket.join(roomId);
+            socket.emit('roomCreated', { roomId, playerId: socket.id });
+            
+            // 广播房间状态
+            io.to(roomId).emit('gameStateUpdate', game.getGameState());
+        });
+
+        // 加入房间
+        socket.on('joinRoom', ({ roomId, playerName }) => {
+            console.log(`Player ${playerName} trying to join room ${roomId}`);
+            const game = games.get(roomId);
+            
+            if (!game) {
+                console.log(`Room ${roomId} not found`);
+                socket.emit('joinError', '房间不存在');
+                return;
+            }
+            
+            if (game.state !== 'waiting') {
+                console.log(`Room ${roomId} game already started`);
+                socket.emit('joinError', '游戏已经开始');
+                return;
+            }
+
+            if (game.players.has(socket.id)) {
+                console.log(`Player ${socket.id} already in room`);
+                socket.emit('joinError', '你已经在房间中');
+                return;
+            }
+
+            game.addPlayer(socket.id, playerName);
+            socket.join(roomId);
+            
+            // 发送玩家加入成功事件
+            socket.emit('playerJoined');
+            
+            // 广播房间状态更新
+            io.to(roomId).emit('gameStateUpdate', game.getGameState());
+            
+            console.log(`Player ${playerName} successfully joined room ${roomId}`);
+        });
+
+        // 开始游戏
+        socket.on('startGame', (roomId) => {
+            const game = games.get(roomId);
+            if (!game || game.players.size < 4) {
+                socket.emit('gameError', '玩家数量不足，无法开始游戏');
+                return;
+            }
+
+            if (game.startGame()) {
+                game.players.forEach((player, playerId) => {
+                    io.to(playerId).emit('gameStarted', {
+                        role: player.role,
+                        word: player.word,
+                        speakingOrder: game.speakingOrder
+                    });
+                });
+                io.to(roomId).emit('gameStateUpdate', game.getGameState());
+            }
+        });
+
+        // 发言结束
+        socket.on('finishSpeaking', (roomId) => {
+            const game = games.get(roomId);
+            if (!game || game.currentSpeaker !== socket.id) return;
+
+            const currentIndex = game.speakingOrder.indexOf(game.currentSpeaker);
+            const nextIndex = (currentIndex + 1) % game.speakingOrder.length;
+            
+            if (nextIndex === 0) {
+                game.state = 'voting';
+                io.to(roomId).emit('votingStart');
+            } else {
+                game.currentSpeaker = game.speakingOrder[nextIndex];
+                io.to(roomId).emit('nextSpeaker', { speakerId: game.currentSpeaker });
+            }
+            
+            io.to(roomId).emit('gameStateUpdate', game.getGameState());
+        });
+
+        // 投票
+        socket.on('vote', ({ roomId, targetId }) => {
+            const game = games.get(roomId);
+            if (!game) return;
+
+            if (game.vote(socket.id, targetId)) {
+                io.to(roomId).emit('voteUpdated', {
+                    votes: Array.from(game.votes.entries())
+                });
+
+                if (game.votes.size === game.players.size) {
+                    const result = game.calculateVoteResult();
+                    if (result) {
+                        io.to(roomId).emit('gameOver', { winner: result });
+                        games.delete(roomId);
+                    } else {
+                        game.state = 'speaking';
+                        game.resetVotes();
+                        game.currentRound++;
+                        io.to(roomId).emit('nextRound');
+                    }
+                }
+                
+                io.to(roomId).emit('gameStateUpdate', game.getGameState());
+            }
+        });
+
+        // 聊天功能
+        socket.on('sendMessage', ({ roomId, message }) => {
+            const game = games.get(roomId);
+            if (!game) return;
+
+            const player = game.players.get(socket.id);
+            io.to(roomId).emit('newMessage', {
+                playerId: socket.id,
+                playerName: player.name,
+                message
+            });
+        });
+
+        // 断开连接处理
+        socket.on('disconnect', () => {
+            console.log('Client disconnected:', socket.id);
+            
+            // 查找玩家所在的房间
+            for (const [roomId, game] of games.entries()) {
+                if (game.players.has(socket.id)) {
+                    const result = game.removePlayer(socket.id);
+                    
+                    if (result) {
+                        io.to(roomId).emit('gameOver', { winner: result });
+                        games.delete(roomId);
+                    } else if (game.players.size < 4) {
+                        io.to(roomId).emit('gameError', '玩家数量不足，游戏终止');
+                        games.delete(roomId);
+                    } else {
+                        io.to(roomId).emit('gameStateUpdate', game.getGameState());
+                    }
+                    
+                    break;
+                }
+            }
+        });
+    });
+}
+
+function generateRoomId() {
+    return Math.random().toString(36).substr(2, 6).toUpperCase();
+}
+
+module.exports = { handleGameEvents }; 
