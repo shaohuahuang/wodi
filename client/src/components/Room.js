@@ -18,6 +18,7 @@ const Room = ({ roomId }) => {
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([]);
     const [username] = useState(localStorage.getItem('username') || '未知玩家');
+    const [votes, setVotes] = useState(new Map());
 
     useEffect(() => {
         if (!socket) return;
@@ -72,6 +73,10 @@ const Room = ({ roomId }) => {
             }]);
         });
 
+        socket.on('voteUpdated', ({ votes: newVotes }) => {
+            setVotes(new Map(newVotes));
+        });
+
         return () => {
             socket.off('gameStateUpdate');
             socket.off('playerJoined');
@@ -81,6 +86,7 @@ const Room = ({ roomId }) => {
             socket.off('gameOver');
             socket.off('newMessage');
             socket.off('playerLeft');
+            socket.off('voteUpdated');
         };
     }, [socket]);
 
@@ -139,6 +145,14 @@ const Room = ({ roomId }) => {
         );
     };
 
+    const getVotesReceived = (playerId) => {
+        return Array.from(votes.values()).filter(targetId => targetId === playerId).length;
+    };
+
+    const getPlayerVote = (playerId) => {
+        return votes.get(playerId);
+    };
+
     return (
         <div className="room">
             <div className="room-header">
@@ -172,27 +186,57 @@ const Room = ({ roomId }) => {
                 <h3>玩家列表 ({gameState.players.length}/8)</h3>
                 <div className="players-list">
                     {gameState.players.map(player => (
-                        <div key={player.id} className={`player ${player.id === socket?.id ? 'current-player' : ''}`}>
+                        <div key={player.id} 
+                            className={`player ${player.id === socket?.id ? 'current-player' : ''} 
+                                      ${getPlayerVote(socket?.id) === player.id ? 'voted-for' : ''}`}
+                        >
                             <div className="player-info">
                                 <span className="player-name">{player.name}</span>
                                 {player.id === socket?.id && <span className="player-tag">(你)</span>}
                                 {gameState.currentSpeaker === player.id && 
                                     <span className="speaking-tag">正在发言</span>}
                                 {!player.isAlive && <span className="dead-tag">已出局</span>}
+                                {gameState.currentPhase === 'voting' && (
+                                    <span className="votes-tag">
+                                        被指认: {getVotesReceived(player.id)} 票
+                                    </span>
+                                )}
                             </div>
-                            {gameState.currentPhase === 'voting' && 
-                             player.id !== socket?.id && 
-                             player.isAlive && (
-                                <button 
-                                    onClick={() => handleVote(player.id)}
-                                    className="vote-button"
-                                >
-                                    投票
-                                </button>
-                            )}
+                            <div className="player-actions">
+                                {gameState.currentPhase === 'voting' && 
+                                 player.id !== socket?.id && 
+                                 player.isAlive && (
+                                    <button 
+                                        onClick={() => handleVote(player.id)}
+                                        className={`vote-button ${getPlayerVote(socket?.id) === player.id ? 'voted' : ''}`}
+                                    >
+                                        {getPlayerVote(socket?.id) === player.id ? '已投票' : '投票'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
+
+                {gameState.currentPhase === 'voting' && votes.size > 0 && (
+                    <div className="voting-summary">
+                        <h4>当前投票情况：</h4>
+                        <div className="votes-list">
+                            {Array.from(votes.entries()).map(([voterId, targetId]) => {
+                                const voter = gameState.players.find(p => p.id === voterId);
+                                const target = gameState.players.find(p => p.id === targetId);
+                                if (!voter || !target) return null;
+                                return (
+                                    <div key={voterId} className="vote-record">
+                                        <span className="voter">{voter.name}</span>
+                                        <span className="vote-arrow">→</span>
+                                        <span className="target">{target.name}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {gameState.currentPhase === 'waiting' && gameState.hostId === socket?.id && (

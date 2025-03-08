@@ -81,14 +81,19 @@
   background-color: #ff9800;
   color: white;
   border: none;
-  padding: 5px 15px;
+  padding: 6px 12px;
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
 }
 
-.vote-button:hover {
+.vote-button:hover:not(.voted) {
   background-color: #f57c00;
+  transform: scale(1.05);
+}
+
+.vote-button.voted {
+  cursor: not-allowed;
 }
 
 .current-player {
@@ -211,4 +216,71 @@
     font-style: italic;
     background-color: #f5f5f5;
     text-align: center;
+}
+
+/* 投票相关样式 */
+.votes-tag {
+    background-color: #9c27b0;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    margin-left: 8px;
+}
+
+.voted-for {
+    background-color: #e8f5e9;
+    border: 2px solid #4caf50;
+}
+
+.vote-button.voted {
+    background-color: #4caf50;
+}
+
+.voting-summary {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f5f5f5;
+    border-radius: 8px;
+}
+
+.voting-summary h4 {
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.votes-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.vote-record {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.voter {
+    color: #2196f3;
+    font-weight: 500;
+}
+
+.vote-arrow {
+    color: #666;
+}
+
+.target {
+    color: #f44336;
+    font-weight: 500;
+}
+
+.player-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
 } 
