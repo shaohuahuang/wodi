@@ -74,8 +74,42 @@ const Room = ({ roomId }) => {
             }]);
         });
 
-        socket.on('voteUpdated', ({ votes: newVotes }) => {
+        socket.on('voteUpdated', ({ votes: newVotes, nextVoter }) => {
             setVotes(new Map(newVotes));
+            
+            // 更新当前投票者
+            setGameState(prev => ({
+                ...prev,
+                currentVoter: nextVoter
+            }));
+
+            // 添加投票进展消息
+            const voter = gameState.players.find(p => p.id === socket?.id);
+            const target = gameState.players.find(p => p.id === Array.from(newVotes.entries()).pop()?.[1]);
+            
+            if (voter && target) {
+                setMessages(prev => [...prev, {
+                    system: true,
+                    message: `${voter.name} 投票给了 ${target.name}`
+                }]);
+            }
+
+            // 如果有下一个投票者，显示提示
+            if (nextVoter) {
+                const nextPlayer = gameState.players.find(p => p.id === nextVoter);
+                if (nextPlayer) {
+                    setMessages(prev => [...prev, {
+                        system: true,
+                        message: `轮到 ${nextPlayer.name} 进行投票`
+                    }]);
+                }
+            } else {
+                // 所有人都投票完成
+                setMessages(prev => [...prev, {
+                    system: true,
+                    message: '所有人投票完成，正在统计结果...'
+                }]);
+            }
         });
 
         socket.on('roundStart', ({ round, currentSpeaker, eliminatedPlayer }) => {
@@ -276,11 +310,15 @@ const Room = ({ roomId }) => {
                 {gameState.currentPhase === 'voting' && (
                     <div className="voting-status">
                         {gameState.currentVoter ? (
-                            <p className="current-voter">
-                                等待 {gameState.players.find(p => p.id === gameState.currentVoter)?.name} 投票
+                            <p className={`current-voter ${gameState.currentVoter === socket?.id ? 'your-turn' : ''}`}>
+                                {gameState.currentVoter === socket?.id ? (
+                                    '轮到你投票了'
+                                ) : (
+                                    `等待 ${gameState.players.find(p => p.id === gameState.currentVoter)?.name} 投票`
+                                )}
                             </p>
                         ) : (
-                            <p>投票结束</p>
+                            <p className="voting-complete">投票结束，正在统计结果...</p>
                         )}
                     </div>
                 )}
