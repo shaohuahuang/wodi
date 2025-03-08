@@ -186,7 +186,7 @@ class GameManager {
         }
     }
 
-    // 调用大模型接口
+    // 修改调用大模型接口方法
     async callLLM(prompt, onChunk) {
         try {
             const response = await fetch('http://localhost:11434/api/generate', {
@@ -197,7 +197,7 @@ class GameManager {
                 body: JSON.stringify({
                     model: "deepseek-r1:8b",
                     prompt: prompt,
-                    stream: true
+                    stream: false  // 关闭流式输出
                 })
             });
 
@@ -205,41 +205,22 @@ class GameManager {
                 throw new Error('API调用失败');
             }
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let fullMessage = '';
-            let isThinking = false;
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n').filter(line => line.trim());
-                
-                for (const line of lines) {
-                    try {
-                        const data = JSON.parse(line);
-                        if (data.response) {
-                            const text = data.response;
-                            // 检查是否进入或退出思考模式
-                            if (text.includes('<think>')) {
-                                isThinking = true;
-                            }
-                            if (text.includes('</think>')) {
-                                isThinking = false;
-                                continue;
-                            }
-                            
-                            // 只有在非思考模式下才显示文本
-                            if (!isThinking && !text.includes('<think>') && !text.includes('</think>')) {
-                                fullMessage += text;
-                                onChunk(text);
-                            }
-                        }
-                    } catch (e) {
-                        console.error('解析响应出错:', e);
-                    }
+            // 非流式输出，直接获取完整响应
+            const data = await response.json();
+            let fullMessage = data.response || '';
+            
+            // 移除<think>标签及其内容
+            fullMessage = fullMessage.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+            
+            // 如果需要模拟流式输出效果，可以在这里实现
+            if (onChunk && typeof onChunk === 'function' && fullMessage && onChunk !== (() => {})) {
+                // 模拟逐字输出效果
+                let displayedMessage = '';
+                for (const char of fullMessage) {
+                    displayedMessage += char;
+                    onChunk(char);
+                    // 添加一个小延迟，模拟打字效果
+                    await new Promise(resolve => setTimeout(resolve, 30));
                 }
             }
 
