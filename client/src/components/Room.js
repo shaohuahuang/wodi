@@ -10,7 +10,8 @@ const Room = ({ roomId }) => {
         myRole: null,
         myWord: null,
         currentSpeaker: null,
-        timeLeft: 0
+        timeLeft: 0,
+        hostId: null
     });
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([]);
@@ -98,6 +99,9 @@ const Room = ({ roomId }) => {
                          gameState.myRole === 'civilian' ? '平民' : '等待游戏开始'}
                     </span></p>
                     <p>你的词语: <span className="highlight">{gameState.myWord || '等待游戏开始'}</span></p>
+                    {gameState.hostId === socket?.id && (
+                        <p className="host-tag">你是房主</p>
+                    )}
                 </div>
             </div>
 
@@ -128,8 +132,13 @@ const Room = ({ roomId }) => {
                 </div>
             </div>
 
-            {gameState.currentPhase === 'waiting' && (
-                <button onClick={handleStartGame}>开始游戏</button>
+            {gameState.currentPhase === 'waiting' && gameState.hostId === socket?.id && (
+                <button 
+                    onClick={handleStartGame}
+                    className="start-game-button"
+                >
+                    开始游戏
+                </button>
             )}
 
             {gameState.currentPhase === 'speaking' && 

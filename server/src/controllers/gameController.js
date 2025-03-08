@@ -30,7 +30,7 @@ function handleGameEvents(io) {
         socket.on('createRoom', (username) => {
             console.log(`Player ${username} creating room`);
             const roomId = generateRoomId();
-            const game = new Game(roomId);
+            const game = new Game(roomId, socket.id);
             game.addPlayer(socket.id, username);
             games.set(roomId, game);
             
@@ -83,7 +83,13 @@ function handleGameEvents(io) {
         // 开始游戏
         socket.on('startGame', (roomId) => {
             const game = games.get(roomId);
-            if (!game || game.players.size < 4) {
+            // 检查是否是房主
+            if (!game || game.hostId !== socket.id) {
+                socket.emit('gameError', '只有房主可以开始游戏');
+                return;
+            }
+
+            if (game.players.size < 4) {
                 socket.emit('gameError', '玩家数量不足，无法开始游戏');
                 return;
             }
@@ -168,9 +174,17 @@ function handleGameEvents(io) {
         socket.on('disconnect', () => {
             console.log('Client disconnected:', socket.id);
             
-            // 查找玩家所在的房间
             for (const [roomId, game] of games.entries()) {
                 if (game.players.has(socket.id)) {
+                    // 如果是房主断开连接，转移房主权限给下一个玩家
+                    if (game.hostId === socket.id) {
+                        const remainingPlayers = Array.from(game.players.keys());
+                        const newHostId = remainingPlayers.find(id => id !== socket.id);
+                        if (newHostId) {
+                            game.transferHost(newHostId);
+                        }
+                    }
+
                     const result = game.removePlayer(socket.id);
                     
                     if (result) {

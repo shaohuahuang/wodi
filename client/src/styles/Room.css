@@ -142,4 +142,25 @@
 .highlight {
   color: #2196F3;
   font-weight: bold;
+}
+
+.host-tag {
+  color: #ff9800;
+  font-weight: bold;
+}
+
+.start-game-button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin: 20px 0;
+}
+
+.start-game-button:hover {
+  background-color: #45a049;
 } 

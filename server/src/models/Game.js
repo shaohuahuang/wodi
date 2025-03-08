@@ -1,8 +1,9 @@
 const { getRandomWordPair } = require('./wordPairs');
 
 class Game {
-    constructor(roomId) {
+    constructor(roomId, hostId) {
         this.roomId = roomId;
+        this.hostId = hostId;
         this.players = new Map(); // 玩家信息
         this.state = 'waiting';   // waiting, speaking, voting, ended
         this.currentRound = 0;
@@ -145,12 +146,20 @@ class Game {
                 id: player.id,
                 name: player.name,
                 isAlive: player.isAlive,
-                // 不要在这里返回role和word，以保持游戏公平性
             })),
+            hostId: this.hostId,
             currentSpeaker: this.currentSpeaker,
             currentRound: this.currentRound,
             votes: Array.from(this.votes.entries())
         };
+    }
+
+    transferHost(newHostId) {
+        if (this.players.has(newHostId)) {
+            this.hostId = newHostId;
+            return true;
+        }
+        return false;
     }
 }
 
