@@ -210,6 +210,42 @@ class GameManager {
         }
     }
 
+    // 添加检查回答是否合规的方法
+    checkAIResponse(response, currentPlayer) {
+        // 检查是否直接包含关键词
+        if (response.includes(currentPlayer.word)) {
+            return {
+                valid: false,
+                reason: '回答中直接包含了关键词'
+            };
+        }
+
+        // 检查是否包含关键词的同义词或近义词
+        const sensitiveWords = [
+            currentPlayer.word,
+            // 可以添加更多同义词或近义词
+        ];
+
+        for (const word of sensitiveWords) {
+            if (response.includes(word)) {
+                return {
+                    valid: false,
+                    reason: '回答中包含了敏感词'
+                };
+            }
+        }
+
+        // 检查回答长度是否合适
+        if (response.length > 50) {
+            return {
+                valid: false,
+                reason: '回答太长了'
+            };
+        }
+
+        return { valid: true };
+    }
+
     // 修改AI行为处理方法
     async handleAIActions() {
         const currentPlayer = this.gameState.players.find(p => 
@@ -218,66 +254,87 @@ class GameManager {
 
         if (!currentPlayer) return;
 
-        // 构建提示词
-        const prompt = this.buildAIPrompt(currentPlayer);
-        
-        try {
-            // 逐字输出AI的发言
-            const fullMessage = await this.callLLM(prompt, (chunk) => {
-                this.notifyAISpeaking({
-                    playerId: currentPlayer.id,
-                    playerName: currentPlayer.name,
-                    message: chunk,
-                    isComplete: false
+        let validResponse = false;
+        let retryCount = 0;
+        const maxRetries = 3;
+        let fullMessage = '';
+
+        while (!validResponse && retryCount < maxRetries) {
+            try {
+                // 构建提示词，只有重试时才添加警告
+                const prompt = this.buildAIPrompt(currentPlayer, retryCount > 0);
+                
+                // 先获取完整回答，不直接显示
+                fullMessage = await this.callLLM(prompt, () => {
+                    // 在获取答案过程中不显示任何内容
                 });
-            });
 
-            // 添加到消息历史记录
-            const chatMessage = {
-                playerId: currentPlayer.id,
-                playerName: currentPlayer.name,
-                message: fullMessage,
-                timestamp: Date.now(),
-                type: 'speech'
-            };
-            this.messages.push(chatMessage);
-
-            // 通知AI发言完成
-            this.notifyAISpeaking({
-                playerId: currentPlayer.id,
-                playerName: currentPlayer.name,
-                message: fullMessage,
-                isComplete: true
-            });
-
-            // 延迟后结束AI发言
-            setTimeout(() => {
-                this.finishSpeaking(currentPlayer.id);
-            }, 1000);
-        } catch (error) {
-            console.error('AI发言出错:', error);
-            const errorMessage = {
-                playerId: currentPlayer.id,
-                playerName: currentPlayer.name,
-                message: '对不起，我现在有点混乱...',
-                timestamp: Date.now(),
-                type: 'speech'
-            };
-            this.messages.push(errorMessage);
-            this.notifyAISpeaking({
-                ...errorMessage,
-                isComplete: true
-            });
-            
-            // 即使出错也要继续游戏
-            setTimeout(() => {
-                this.finishSpeaking(currentPlayer.id);
-            }, 1000);
+                // 检查回答是否合规
+                const checkResult = this.checkAIResponse(fullMessage, currentPlayer);
+                
+                if (checkResult.valid) {
+                    validResponse = true;
+                    // 只有回答合规时，才逐字显示到聊天框
+                    let displayedMessage = '';
+                    for (const char of fullMessage) {
+                        displayedMessage += char;
+                        this.notifyAISpeaking({
+                            playerId: currentPlayer.id,
+                            playerName: currentPlayer.name,
+                            message: displayedMessage,
+                            isComplete: false
+                        });
+                        // 添加一个小延迟，实现打字效果
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                } else {
+                    console.log(`AI回答不合规 (${checkResult.reason})，重试中...`);
+                    retryCount++;
+                }
+            } catch (error) {
+                console.error('AI发言出错:', error);
+                retryCount++;
+            }
         }
+
+        // 如果多次重试后仍然失败，使用安全的默认回答
+        if (!validResponse) {
+            fullMessage = '这个特征很难描述，让我想想...';
+            // 显示默认回答
+            this.notifyAISpeaking({
+                playerId: currentPlayer.id,
+                playerName: currentPlayer.name,
+                message: fullMessage,
+                isComplete: false
+            });
+        }
+
+        // 添加到消息历史记录
+        const chatMessage = {
+            playerId: currentPlayer.id,
+            playerName: currentPlayer.name,
+            message: fullMessage,
+            timestamp: Date.now(),
+            type: 'speech'
+        };
+        this.messages.push(chatMessage);
+
+        // 通知AI发言完成
+        this.notifyAISpeaking({
+            playerId: currentPlayer.id,
+            playerName: currentPlayer.name,
+            message: fullMessage,
+            isComplete: true
+        });
+
+        // 延迟后结束AI发言
+        setTimeout(() => {
+            this.finishSpeaking(currentPlayer.id);
+        }, 1000);
     }
 
-    // 构建AI提示词
-    buildAIPrompt(currentPlayer) {
+    // 修改提示词构建方法，强调简短回答
+    buildAIPrompt(currentPlayer, isRetry = false) {
         const gameInfo = {
             currentRound: this.gameState.currentRound,
             totalPlayers: this.gameState.players.length,
@@ -291,26 +348,27 @@ class GameManager {
                 }))
         };
 
-        return `你正在参与一个谁是卧底游戏，你需要扮演一个普通的游戏玩家"${currentPlayer.name}"。
-你的词语是"${currentPlayer.word}"，身份是${currentPlayer.role === 'undercover' ? '卧底' : '平民'}。
+        let warningMessage = isRetry ? 
+            '\n警告：你上一次的回答暴露了关键词或太长了。记住，要简短且不能暴露词语！\n' : '';
 
+        return `你正在参与谁是卧底游戏，扮演玩家"${currentPlayer.name}"。
+你的词语是"${currentPlayer.word}"，身份是${currentPlayer.role === 'undercover' ? '卧底' : '平民'}。
+${warningMessage}
 要求：
-1. 你的回答要像一个真实的玩家，语气要自然随意
-2. 描述要基于你的词语的实际特征，但要含糊其辞
-3. 不要重复其他玩家已经说过的特征或描述
-4. 发言要简短自然，控制在30个字以内
-5. 如果是平民：
-   - 要描述你词语的独特特征，但不能直接说出这个词
-   - 要基于词语的真实属性来描述，避免编造不存在的特征
-6. 如果是卧底：
-   - 要假装理解其他人的描述，适当跟随大家的思路
-   - 描述时要基于你的词语，但要让它听起来像在描述平民的词
-   - 要巧妙地误导，但不要过分明显
+1. 回答必须简短，最多15个字
+2. 只描述一个特征，不要啰嗦
+3. 语气要自然，像真人说话
+4. 如果是平民：
+   - 描述你词语的一个特征，但绝不能说出这个词
+   - 要基于词语的真实特征
+5. 如果是卧底：
+   - 跟随大家的思路，但要巧妙误导
+   - 让描述听起来像在说平民的词
 
 之前的发言：
 ${gameInfo.previousSpeeches.map(s => `${s.playerName}: ${s.content}`).join('\n')}
 
-请直接给出你的发言内容，不要有任何解释或推理过程。记住要说一些新的、未被提及过的特征。`;
+直接给出一句简短的描述，不要有任何解释。`;
     }
 
     // 修改结束发言方法
