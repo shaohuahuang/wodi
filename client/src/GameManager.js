@@ -316,7 +316,7 @@ ${gameInfo.previousSpeeches.map(s => `${s.playerName}: ${s.content}`).join('\n')
     // 修改结束发言方法
     finishSpeaking(playerId) {
         this.stopTimer();
-        console.log('Finishing speech for player:', playerId); // 调试日志
+        console.log('Finishing speech for player:', playerId);
 
         // 检查是否是当前发言者
         if (this.gameState.currentSpeaker !== playerId) {
@@ -332,138 +332,179 @@ ${gameInfo.previousSpeeches.map(s => `${s.playerName}: ${s.content}`).join('\n')
         if (nextIndex === 0) {
             // 一轮发言结束，进入投票阶段
             this.gameState.currentPhase = 'voting';
-            this.gameState.currentVoter = this.gameState.speakingOrder[this.gameState.speakingOrder.length - 1];
+            this.gameState.currentVoter = this.gameState.speakingOrder[0]; // 从第一个玩家开始投票
             this.gameState.votes = new Map();
             console.log('Round finished, entering voting phase');
+            
+            // 更新游戏状态
+            this.notifyGameStateUpdate();
+
+            // 如果第一个投票者是AI，开始AI投票
+            if (this.gameState.currentVoter !== 'host') {
+                console.log('Starting AI voting');
+                setTimeout(() => {
+                    this.handleAIVote();
+                }, 1000);
+            } else {
+                // 如果是房主投票，开始计时
+                this.startTimer(this.settings.votingTime);
+            }
         } else {
-            // 下一个玩家发言
+            // 继续下一个玩家发言
             this.gameState.currentSpeaker = this.gameState.speakingOrder[nextIndex];
             console.log('Next speaker:', this.gameState.currentSpeaker);
-        }
+            
+            // 更新游戏状态
+            this.notifyGameStateUpdate();
 
-        // 更新游戏状态
-        this.notifyGameStateUpdate();
-
-        // 如果下一个是AI玩家，自动开始AI行为
-        if (this.gameState.currentSpeaker !== 'host' && this.gameState.currentPhase === 'speaking') {
-            console.log('Starting AI actions for next speaker');
-            setTimeout(() => {
-                this.handleAIActions();
-            }, 1000); // 给一个短暂的延迟，让UI有时间更新
+            // 如果下一个是AI玩家，自动开始AI行为
+            if (this.gameState.currentSpeaker !== 'host' && this.gameState.currentPhase === 'speaking') {
+                console.log('Starting AI actions for next speaker');
+                setTimeout(() => {
+                    this.handleAIActions();
+                }, 1000);
+            } else if (this.gameState.currentSpeaker === 'host') {
+                // 如果是房主发言，开始计时
+                this.startTimer(this.settings.speakingTime);
+            }
         }
     }
 
-    // 投票
-    vote(targetId) {
-        this.stopTimer();
-        if (this.gameState.currentPhase !== 'voting' || 
-            this.gameState.currentVoter !== 'host') return;
+    // 修改AI投票处理方法
+    async handleAIVote() {
+        const currentPlayer = this.gameState.players.find(p => p.id === this.gameState.currentVoter);
+        if (!currentPlayer) return;
 
-        // 记录投票
-        this.gameState.votes.set('host', targetId);
-        
-        // 添加投票记录到消息
-        const voter = this.gameState.players.find(p => p.id === 'host');
-        const target = this.gameState.players.find(p => p.id === targetId);
-        const voteMessage = {
-            system: true,
-            type: 'vote',
-            message: `${voter.name} 投票给了 ${target.name}`,
-            timestamp: Date.now()
-        };
-        this.messages.push(voteMessage);
-        this.notifyNewMessage(voteMessage);
+        try {
+            // 构建投票提示词
+            const prompt = this.buildAIVotePrompt(currentPlayer);
+            
+            // 调用大模型获取投票决策
+            let targetId = null;
+            const fullResponse = await this.callLLM(prompt, () => {});  // 不需要逐字显示
+            
+            // 从回答中提取目标玩家
+            const validTargets = this.gameState.players.filter(p => 
+                p.id !== currentPlayer.id && p.isAlive
+            );
+            
+            // 尝试根据大模型的回答找到目标玩家
+            for (const target of validTargets) {
+                if (fullResponse.includes(target.name)) {
+                    targetId = target.id;
+                    break;
+                }
+            }
 
-        // 获取下一个投票者
-        const currentIndex = this.gameState.speakingOrder.indexOf('host');
+            // 如果没有找到有效目标，随机选择
+            if (!targetId) {
+                const randomTarget = validTargets[Math.floor(Math.random() * validTargets.length)];
+                targetId = randomTarget.id;
+            }
+
+            // 延迟一下再投票，模拟思考
+            setTimeout(() => {
+                // 记录投票
+                this.gameState.votes.set(currentPlayer.id, targetId);
+                const targetPlayer = this.gameState.players.find(p => p.id === targetId);
+
+                // 添加投票记录到消息
+                const voteMessage = {
+                    system: true,
+                    type: 'vote',
+                    message: `${currentPlayer.name} 投票给了 ${targetPlayer.name}`,
+                    timestamp: Date.now()
+                };
+                this.messages.push(voteMessage);
+                this.notifyNewMessage(voteMessage);
+
+                // 处理下一个投票者
+                this.handleNextVoter(currentPlayer.id);
+            }, 1500);
+
+        } catch (error) {
+            console.error('AI投票出错:', error);
+            // 出错时随机投票
+            const validTargets = this.gameState.players.filter(p => 
+                p.id !== currentPlayer.id && p.isAlive
+            );
+            const targetPlayer = validTargets[Math.floor(Math.random() * validTargets.length)];
+            
+            setTimeout(() => {
+                this.gameState.votes.set(currentPlayer.id, targetPlayer.id);
+                const voteMessage = {
+                    system: true,
+                    type: 'vote',
+                    message: `${currentPlayer.name} 投票给了 ${targetPlayer.name}`,
+                    timestamp: Date.now()
+                };
+                this.messages.push(voteMessage);
+                this.notifyNewMessage(voteMessage);
+                
+                this.handleNextVoter(currentPlayer.id);
+            }, 1500);
+        }
+    }
+
+    // 处理下一个投票者
+    handleNextVoter(currentVoterId) {
+        const currentIndex = this.gameState.speakingOrder.indexOf(currentVoterId);
         const nextIndex = (currentIndex + 1) % this.gameState.speakingOrder.length;
-        
+
         if (nextIndex === 0) {
             // 所有人都投票完成，计算结果
             this.calculateVoteResult();
         } else {
-            // 下一个玩家投票
+            // 继续下一个玩家投票
             this.gameState.currentVoter = this.gameState.speakingOrder[nextIndex];
             this.notifyVoteUpdate({
                 votes: Array.from(this.gameState.votes.entries()),
                 nextVoter: this.gameState.currentVoter
             });
 
-            // 如果下一个是AI玩家，自动投票
+            // 如果下一个还是AI，继续AI投票
             if (this.gameState.currentVoter !== 'host') {
                 this.handleAIVote();
             }
         }
     }
 
-    // 处理AI投票
-    async handleAIVote() {
-        const currentPlayer = this.gameState.players.find(p => p.id === this.gameState.currentVoter);
-        if (!currentPlayer) return;
+    // 构建AI投票提示词
+    buildAIVotePrompt(currentPlayer) {
+        const gameInfo = {
+            currentRound: this.gameState.currentRound,
+            totalPlayers: this.gameState.players.length,
+            myWord: currentPlayer.word,
+            myRole: currentPlayer.role,
+            alivePlayers: this.gameState.players.filter(p => p.isAlive && p.id !== currentPlayer.id),
+            previousSpeeches: this.messages
+                .filter(m => m.type === 'speech')
+                .map(m => ({
+                    playerName: m.playerName,
+                    content: m.message
+                }))
+        };
 
-        // AI投票策略：
-        // 1. 如果是卧底，优先投票给说话最像平民的玩家
-        // 2. 如果是平民，优先投票给说话可疑的玩家
-        let targetPlayer;
-        const validTargets = this.gameState.players.filter(p => 
-            p.id !== currentPlayer.id && p.isAlive
-        );
+        return `你正在玩谁是卧底游戏，现在是投票阶段。
+你是${currentPlayer.name}，你的词语是"${currentPlayer.word}"，身份是${currentPlayer.role === 'undercover' ? '卧底' : '平民'}。
 
-        if (currentPlayer.role === 'undercover') {
-            // 卧底策略：随机选择一个平民投票
-            const civilians = validTargets.filter(p => p.role === 'civilian');
-            if (civilians.length > 0) {
-                targetPlayer = civilians[Math.floor(Math.random() * civilians.length)];
-            }
-        } else {
-            // 平民策略：优先投票给卧底，其次随机
-            const undercovers = validTargets.filter(p => p.role === 'undercover');
-            if (undercovers.length > 0) {
-                targetPlayer = undercovers[Math.floor(Math.random() * undercovers.length)];
-            }
-        }
+所有玩家的发言记录：
+${gameInfo.previousSpeeches.map(s => `${s.playerName}: ${s.content}`).join('\n')}
 
-        // 如果没有找到目标，随机选择
-        if (!targetPlayer) {
-            targetPlayer = validTargets[Math.floor(Math.random() * validTargets.length)];
-        }
+当前存活的其他玩家：
+${gameInfo.alivePlayers.map(p => p.name).join(', ')}
 
-        // 延迟一下再投票，模拟思考
-        setTimeout(() => {
-            // 记录投票
-            this.gameState.votes.set(currentPlayer.id, targetPlayer.id);
+根据以上信息，分析每个玩家的发言，并决定要投票给谁。
 
-            // 添加投票记录到消息
-            const voteMessage = {
-                system: true,
-                type: 'vote',
-                message: `${currentPlayer.name} 投票给了 ${targetPlayer.name}`,
-                timestamp: Date.now()
-            };
-            this.messages.push(voteMessage);
-            this.notifyNewMessage(voteMessage);
+如果你是平民：
+- 分析哪些玩家的描述与大家不一致
+- 找出最可能是卧底的玩家
 
-            // 获取下一个投票者
-            const currentIndex = this.gameState.speakingOrder.indexOf(currentPlayer.id);
-            const nextIndex = (currentIndex + 1) % this.gameState.speakingOrder.length;
+如果你是卧底：
+- 找出最有威胁的平民（描述最准确的玩家）
+- 避免暴露自己的身份
 
-            if (nextIndex === 0) {
-                // 所有人都投票完成，计算结果
-                this.calculateVoteResult();
-            } else {
-                // 继续下一个玩家投票
-                this.gameState.currentVoter = this.gameState.speakingOrder[nextIndex];
-                this.notifyVoteUpdate({
-                    votes: Array.from(this.gameState.votes.entries()),
-                    nextVoter: this.gameState.currentVoter
-                });
-
-                // 如果下一个还是AI，继续AI投票
-                if (this.gameState.currentVoter !== 'host') {
-                    this.handleAIVote();
-                }
-            }
-        }, 1500);
+请直接回答你要投票的玩家名字，不要有任何解释或推理过程。`;
     }
 
     // 发送消息
@@ -799,6 +840,31 @@ ${gameInfo.previousSpeeches.map(s => `${s.playerName}: ${s.content}`).join('\n')
         if (this.onTimerUpdate) {
             this.onTimerUpdate(this.timeLeft);
         }
+    }
+
+    // 投票方法
+    vote(targetId) {
+        this.stopTimer();
+        if (this.gameState.currentPhase !== 'voting' || 
+            this.gameState.currentVoter !== 'host') return;
+
+        // 记录投票
+        this.gameState.votes.set('host', targetId);
+        
+        // 添加投票记录到消息
+        const voter = this.gameState.players.find(p => p.id === 'host');
+        const target = this.gameState.players.find(p => p.id === targetId);
+        const voteMessage = {
+            system: true,
+            type: 'vote',
+            message: `${voter.name} 投票给了 ${target.name}`,
+            timestamp: Date.now()
+        };
+        this.messages.push(voteMessage);
+        this.notifyNewMessage(voteMessage);
+
+        // 处理下一个投票者
+        this.handleNextVoter('host');
     }
 }
 
