@@ -13,7 +13,8 @@ const Room = ({ roomId }) => {
         myWord: null,
         currentSpeaker: null,
         timeLeft: 0,
-        hostId: null
+        hostId: null,
+        currentVoter: null
     });
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([]);
@@ -84,6 +85,13 @@ const Room = ({ roomId }) => {
                     message: `玩家 ${eliminatedPlayer.name} 被投票出局，身份是${eliminatedPlayer.role === 'undercover' ? '卧底' : '平民'}`
                 }]);
             }
+            
+            setGameState(prev => ({
+                ...prev,
+                currentPhase: 'speaking',
+                currentSpeaker: currentSpeaker,
+                currentRound: round
+            }));
             
             setMessages(prev => [...prev, {
                 system: true,
@@ -163,7 +171,11 @@ const Room = ({ roomId }) => {
     };
 
     const getVotesReceived = (playerId) => {
-        return Array.from(votes.values()).filter(targetId => targetId === playerId).length;
+        return Array.from(votes.entries())
+            .filter(([voterId, targetId]) => {
+                const voter = gameState.players.find(p => p.id === voterId);
+                return voter?.isAlive && targetId === playerId;
+            }).length;
     };
 
     const getPlayerVote = (playerId) => {
@@ -204,8 +216,11 @@ const Room = ({ roomId }) => {
                 <div className="players-list">
                     {gameState.players.map(player => (
                         <div key={player.id} 
-                            className={`player ${player.id === socket?.id ? 'current-player' : ''} 
-                                      ${getPlayerVote(socket?.id) === player.id ? 'voted-for' : ''}`}
+                            className={`player 
+                                ${player.id === socket?.id ? 'current-player' : ''} 
+                                ${getPlayerVote(socket?.id) === player.id ? 'voted-for' : ''}
+                                ${gameState.currentPhase === 'speaking' && gameState.currentSpeaker === player.id ? 'speaking' : ''}
+                            `}
                         >
                             <div className="player-info">
                                 <span className="player-name">{player.name}</span>
@@ -222,7 +237,10 @@ const Room = ({ roomId }) => {
                             <div className="player-actions">
                                 {gameState.currentPhase === 'voting' && 
                                  player.id !== socket?.id && 
-                                 player.isAlive && (
+                                 player.isAlive &&
+                                 gameState.players.find(p => p.id === socket?.id)?.isAlive &&
+                                 gameState.currentVoter === socket?.id &&
+                                 (
                                     <button 
                                         onClick={() => handleVote(player.id)}
                                         className={`vote-button ${getPlayerVote(socket?.id) === player.id ? 'voted' : ''}`}
@@ -242,7 +260,7 @@ const Room = ({ roomId }) => {
                             {Array.from(votes.entries()).map(([voterId, targetId]) => {
                                 const voter = gameState.players.find(p => p.id === voterId);
                                 const target = gameState.players.find(p => p.id === targetId);
-                                if (!voter || !target) return null;
+                                if (!voter || !target || !voter.isAlive || !target.isAlive) return null;
                                 return (
                                     <div key={voterId} className="vote-record">
                                         <span className="voter">{voter.name}</span>
@@ -252,6 +270,18 @@ const Room = ({ roomId }) => {
                                 );
                             })}
                         </div>
+                    </div>
+                )}
+
+                {gameState.currentPhase === 'voting' && (
+                    <div className="voting-status">
+                        {gameState.currentVoter ? (
+                            <p className="current-voter">
+                                等待 {gameState.players.find(p => p.id === gameState.currentVoter)?.name} 投票
+                            </p>
+                        ) : (
+                            <p>投票结束</p>
+                        )}
                     </div>
                 )}
             </div>
@@ -266,8 +296,13 @@ const Room = ({ roomId }) => {
             )}
 
             {gameState.currentPhase === 'speaking' && 
-             gameState.currentSpeaker === socket.id && (
-                <button onClick={handleFinishSpeaking}>结束发言</button>
+             gameState.currentSpeaker === socket?.id && (
+                <button 
+                    onClick={handleFinishSpeaking}
+                    className="finish-speaking-button"
+                >
+                    结束发言
+                </button>
             )}
 
             <div className="chat">

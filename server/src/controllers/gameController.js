@@ -137,7 +137,8 @@ function handleGameEvents(io) {
             const nextIndex = (currentIndex + 1) % game.speakingOrder.length;
             
             if (nextIndex === 0) {
-                game.state = 'voting';
+                // 开始投票阶段
+                game.startVoting();
                 io.to(roomId).emit('votingStart');
             } else {
                 game.currentSpeaker = game.speakingOrder[nextIndex];
@@ -155,11 +156,12 @@ function handleGameEvents(io) {
             if (game.vote(socket.id, targetId)) {
                 // 广播投票更新
                 io.to(roomId).emit('voteUpdated', {
-                    votes: Array.from(game.votes.entries())
+                    votes: Array.from(game.votes.entries()),
+                    nextVoter: game.currentVoter
                 });
 
                 // 检查是否所有人都投票了
-                if (game.votes.size === game.getAlivePlayersCount()) {
+                if (!game.currentVoter) {
                     const result = game.calculateVoteResult();
                     if (result) {
                         // 游戏结束

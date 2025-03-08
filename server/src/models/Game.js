@@ -17,6 +17,7 @@ class Game {
         };
         this.timer = null;
         this.lastEliminatedPlayer = null;  // 记录最后被淘汰的玩家
+        this.currentVoter = null;  // 添加当前投票者追踪
     }
 
     addPlayer(playerId, username) {
@@ -63,10 +64,25 @@ class Game {
     }
 
     vote(voterId, targetId) {
+        // 检查是否是投票阶段
         if (this.state !== 'voting') return false;
-        if (!this.players.get(voterId).isAlive) return false;
+        
+        // 检查是否轮到该玩家投票
+        if (voterId !== this.currentVoter) return false;
+        
+        // 检查投票者是否存活
+        const voter = this.players.get(voterId);
+        if (!voter || !voter.isAlive) return false;
+        
+        // 检查目标玩家是否存活
+        const target = this.players.get(targetId);
+        if (!target || !target.isAlive) return false;
         
         this.votes.set(voterId, targetId);
+        
+        // 更新下一个投票者
+        this.currentVoter = this.getNextVoter();
+        
         return true;
     }
 
@@ -166,6 +182,7 @@ class Game {
             players: activePlayers,
             hostId: this.hostId,
             currentSpeaker: this.currentSpeaker,
+            currentVoter: this.currentVoter,  // 添加当前投票者信息
             currentRound: this.currentRound,
             votes: Array.from(this.votes.entries()),
             lastEliminatedPlayer: this.lastEliminatedPlayer
@@ -195,6 +212,7 @@ class Game {
         
         // 重新设置游戏状态为发言阶段
         this.state = 'speaking';
+        this.currentVoter = null;  // 重置当前投票者
         
         // 更新发言顺序（只包含存活玩家）
         this.speakingOrder = Array.from(this.players.entries())
@@ -204,6 +222,32 @@ class Game {
         
         // 设置第一个发言者
         this.currentSpeaker = this.speakingOrder[0];
+    }
+
+    // 开始投票阶段
+    startVoting() {
+        this.state = 'voting';
+        this.votes.clear();
+        // 设置第一个投票者（使用发言顺序的反向）
+        this.currentVoter = this.speakingOrder[this.speakingOrder.length - 1];
+    }
+
+    // 获取下一个投票者
+    getNextVoter() {
+        const currentIndex = this.speakingOrder.indexOf(this.currentVoter);
+        if (currentIndex === -1) return null;
+        
+        // 反向遍历发言顺序
+        let nextIndex = currentIndex - 1;
+        while (nextIndex >= 0) {
+            const nextVoterId = this.speakingOrder[nextIndex];
+            const nextVoter = this.players.get(nextVoterId);
+            if (nextVoter && nextVoter.isAlive) {
+                return nextVoterId;
+            }
+            nextIndex--;
+        }
+        return null;  // 所有人都投票完了
     }
 }
 
