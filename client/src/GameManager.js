@@ -786,10 +786,10 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
         
         // 设置投票顺序（所有存活玩家）
         const alivePlayers = this.gameState.players.filter(p => p.isAlive);
-        this.gameState.speakingOrder = alivePlayers.map(p => p.id);
+        this.gameState.votingOrder = alivePlayers.map(p => p.id);
         
         // 从第一个玩家开始投票
-        this.gameState.currentVoter = this.gameState.speakingOrder[0];
+        this.gameState.currentVoter = this.gameState.votingOrder[0];
         
         // 通知状态更新
         this.notifyGameStateUpdate();
@@ -888,15 +888,15 @@ ${tiedPlayers.map(p => p.name).join('、')}
 
     // 处理平票决胜的下一个投票者
     handleNextTiebreakerVoter(currentVoterId) {
-        const currentIndex = this.gameState.speakingOrder.indexOf(currentVoterId);
-        const nextIndex = (currentIndex + 1) % this.gameState.speakingOrder.length;
+        const currentIndex = this.gameState.votingOrder.indexOf(currentVoterId);
+        const nextIndex = (currentIndex + 1) % this.gameState.votingOrder.length;
 
         if (nextIndex === 0) {
             // 所有人都投票完成，计算结果
             this.calculateTiebreakerResult();
         } else {
             // 继续下一个玩家投票
-            this.gameState.currentVoter = this.gameState.speakingOrder[nextIndex];
+            this.gameState.currentVoter = this.gameState.votingOrder[nextIndex];
             this.notifyVoteUpdate({
                 votes: Array.from(this.gameState.votes.entries()),
                 nextVoter: this.gameState.currentVoter
@@ -935,7 +935,10 @@ ${tiedPlayers.map(p => p.name).join('、')}
         }
 
         // 如果还是平票，随机选择一个
-        const eliminatedId = eliminatedPlayers[Math.floor(Math.random() * eliminatedPlayers.length)];
+        const eliminatedId = eliminatedPlayers.length > 1 
+            ? eliminatedPlayers[Math.floor(Math.random() * eliminatedPlayers.length)]
+            : eliminatedPlayers[0];
+        
         const eliminatedPlayer = this.gameState.players.find(p => p.id === eliminatedId);
 
         // 标记玩家出局
@@ -945,7 +948,9 @@ ${tiedPlayers.map(p => p.name).join('、')}
         const resultMessage = {
             system: true,
             type: 'result',
-            message: `平票决胜投票结束！${eliminatedPlayer.name} 被投票出局了！`,
+            message: eliminatedPlayers.length > 1
+                ? `平票决胜仍然平票！随机选择 ${eliminatedPlayer.name} 被投票出局！`
+                : `平票决胜投票结束！${eliminatedPlayer.name} 被投票出局了！`,
             timestamp: Date.now()
         };
         this.messages.push(resultMessage);
