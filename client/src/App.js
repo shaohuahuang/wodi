@@ -1,48 +1,49 @@
-import React from 'react';
-import { BrowserRouter as Router, Route, Routes, useParams, Navigate } from 'react-router-dom';
-import { SocketProvider } from './context/SocketContext';
-import Login from './pages/Login';
-import Home from './pages/Home';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import Login from './components/Login';
 import Room from './components/Room';
+import GameManager from './GameManager';
 import './styles/App.css';
 
-// 路由保护组件
-const ProtectedRoute = ({ children }) => {
-    const username = localStorage.getItem('username');
-    if (!username) {
-        return <Navigate to="/login" />;
-    }
-    return children;
-};
-
 function App() {
+    const [gameManager] = useState(() => {
+        const manager = new GameManager();
+        const savedUsername = localStorage.getItem('username');
+        if (savedUsername) {
+            manager.createGame(savedUsername);
+        }
+        return manager;
+    });
+    const [username, setUsername] = useState(localStorage.getItem('username') || '');
+
+    const handleLogin = (name) => {
+        setUsername(name);
+        localStorage.setItem('username', name);
+        gameManager.createGame(name);
+    };
+
     return (
-        <SocketProvider>
-            <Router>
-                <div className="App">
-                    <Routes>
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/" element={
-                            <ProtectedRoute>
-                                <Home />
-                            </ProtectedRoute>
-                        } />
-                        <Route path="/room/:roomId" element={
-                            <ProtectedRoute>
-                                <RoomWrapper />
-                            </ProtectedRoute>
-                        } />
-                    </Routes>
-                </div>
-            </Router>
-        </SocketProvider>
+        <Router>
+            <Routes>
+                <Route 
+                    path="/" 
+                    element={
+                        username ? 
+                            <Navigate to="/room" /> : 
+                            <Login onLogin={handleLogin} />
+                    } 
+                />
+                <Route 
+                    path="/room" 
+                    element={
+                        username ? 
+                            <Room gameManager={gameManager} username={username} /> : 
+                            <Navigate to="/" />
+                    } 
+                />
+            </Routes>
+        </Router>
     );
 }
-
-// 包装Room组件以获取URL参数
-const RoomWrapper = () => {
-    const { roomId } = useParams();
-    return <Room roomId={roomId} />;
-};
 
 export default App; 

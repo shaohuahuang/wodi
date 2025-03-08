@@ -47,6 +47,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .player-name {
@@ -406,4 +407,46 @@
 .game-stats p {
     margin: 8px 0;
     color: #333;
+}
+
+.game-controls {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.start-game-button:hover:not(:disabled) {
+    background-color: #45a049;
+    transform: scale(1.05);
+}
+
+.start-game-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.add-ai-button {
+    padding: 12px 24px;
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.add-ai-button:hover {
+    background-color: #1976D2;
+    transform: scale(1.05);
+}
+
+.ai-tag {
+    background-color: #9c27b0;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    margin-left: 8px;
 } 
