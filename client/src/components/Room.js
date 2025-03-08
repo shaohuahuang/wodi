@@ -57,20 +57,37 @@ const Room = ({ gameManager, username }) => {
             }));
             setVotes(new Map());
         };
-        gameManager.onAISpeaking = ({ playerId, playerName, message, isComplete }) => {
+        gameManager.onAISpeaking = ({ playerId, playerName, message, isComplete, reset }) => {
+            if (reset) {
+                // 如果有重置标志，清除该玩家的所有未完成消息
+                setMessages(prev => prev.filter(m => 
+                    !(m.playerId === playerId && !m.isComplete)
+                ));
+            }
+            
             if (!isComplete) {
                 setMessages(prev => {
                     const lastMessage = prev[prev.length - 1];
                     if (lastMessage && lastMessage.playerId === playerId && !lastMessage.isComplete) {
+                        // 更新最后一条未完成的消息
                         const newMessages = [...prev];
                         newMessages[newMessages.length - 1] = {
                             ...lastMessage,
-                            message: lastMessage.message + message
+                            message: message
                         };
                         return newMessages;
                     } else {
+                        // 添加新消息
                         return [...prev, { playerId, playerName, message, isComplete: false }];
                     }
+                });
+            } else {
+                // 消息完成，更新状态
+                setMessages(prev => {
+                    const newMessages = prev.filter(m => 
+                        !(m.playerId === playerId && !m.isComplete)
+                    );
+                    return [...newMessages, { playerId, playerName, message, isComplete: true }];
                 });
             }
         };

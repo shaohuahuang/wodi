@@ -275,6 +275,16 @@ class GameManager {
                 if (checkResult.valid) {
                     validResponse = true;
                     // 只有回答合规时，才逐字显示到聊天框
+                    // 清空之前可能存在的消息
+                    this.notifyAISpeaking({
+                        playerId: currentPlayer.id,
+                        playerName: currentPlayer.name,
+                        message: '',
+                        isComplete: false,
+                        reset: true  // 添加重置标志
+                    });
+                    
+                    // 逐字显示
                     let displayedMessage = '';
                     for (const char of fullMessage) {
                         displayedMessage += char;
@@ -305,7 +315,8 @@ class GameManager {
                 playerId: currentPlayer.id,
                 playerName: currentPlayer.name,
                 message: fullMessage,
-                isComplete: false
+                isComplete: false,
+                reset: true  // 添加重置标志
             });
         }
 
