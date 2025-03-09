@@ -7,23 +7,43 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
     
     // 计算玩家在桌子周围的位置
     const positionPlayers = () => {
-        // 复制玩家数组，确保当前用户在正下方位置
-        const hostIndex = players.findIndex(p => p.id === 'host');
-        const arrangedPlayers = [...players];
-        
-        // 如果找到了主机玩家，将其移到数组末尾（桌子底部位置）
-        if (hostIndex !== -1) {
-            const hostPlayer = arrangedPlayers.splice(hostIndex, 1)[0];
-            arrangedPlayers.push(hostPlayer);
-        }
-        
         // 创建包含空位置的完整数组
         const fullPositions = new Array(maxPlayers).fill(null);
         
-        // 填充已有玩家
-        arrangedPlayers.forEach((player, index) => {
-            fullPositions[index] = player;
-        });
+        // 找到房主位置
+        const hostIndex = players.findIndex(p => p.id === 'host');
+        
+        if (hostIndex !== -1) {
+            // 计算房主应该在的位置 - 底部中间
+            const hostPosition = Math.floor(maxPlayers / 2);
+            
+            // 放置房主
+            fullPositions[hostPosition] = players[hostIndex];
+            
+            // 放置其他玩家 - 顺时针排列
+            let currentPosition = (hostPosition + 1) % maxPlayers;
+            
+            // 先放置AI玩家
+            players.forEach((player, index) => {
+                if (index !== hostIndex && player.isAI) {
+                    fullPositions[currentPosition] = player;
+                    currentPosition = (currentPosition + 1) % maxPlayers;
+                }
+            });
+            
+            // 再放置其他人类玩家
+            players.forEach((player, index) => {
+                if (index !== hostIndex && !player.isAI) {
+                    fullPositions[currentPosition] = player;
+                    currentPosition = (currentPosition + 1) % maxPlayers;
+                }
+            });
+        } else {
+            // 如果没有房主，直接按顺序放置
+            players.forEach((player, index) => {
+                fullPositions[index] = player;
+            });
+        }
         
         return fullPositions;
     };
