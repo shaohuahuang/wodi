@@ -238,7 +238,7 @@ class GameManager {
                         { role: 'system', content: '你是一个谁是卧底游戏的AI助手，请根据用户的提示提供简洁、有用的回答。' },
                         { role: 'user', content: prompt }
                     ],
-                    temperature: 0.7,
+                    temperature: 1.5,
                     max_tokens: 800,
                     stream: !!onProgress
                 })
