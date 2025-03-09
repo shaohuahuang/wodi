@@ -33,6 +33,7 @@ class GameManager {
             hostId: 'host'
         };
         this.wordPairs = [...WORD_PAIRS];
+        this.usedWordPairs = []; // 新增：记录已使用过的词语对
         this.settings = {
             maxPlayers: 8,
             minPlayers: 4,
@@ -49,7 +50,10 @@ class GameManager {
 
     // 创建新游戏
     createGame(playerName) {
-        // 初始化游戏状态，包含房主
+        // 加载已使用的词语对
+        this.loadUsedWordPairs();
+        
+        // 原有的创建游戏代码...
         this.gameState = {
             players: [{
                 id: 'host',
@@ -71,28 +75,47 @@ class GameManager {
 
     // 添加AI玩家
     addAIPlayer() {
-        if (!this.gameState) return;
+        if (!this.gameState) {
+            console.error('游戏状态未初始化');
+            return;
+        }
         
         // 检查是否达到最大玩家数
-        if (this.gameState.players.length >= 8) {
+        if (this.gameState.players.length >= this.settings.maxPlayers) {
             console.log('已达到最大玩家数量');
             return;
         }
 
-        // 生成AI玩家ID和名字
-        const aiName = `AI玩家${this.gameState.players.length}`;
-        const aiId = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        try {
+            // 生成AI玩家ID和名字
+            const playerCount = this.gameState.players.length;
+            const aiName = `AI玩家${playerCount + 1}`;
+            const aiId = `ai_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
 
-        // 添加AI玩家到玩家列表
-        this.gameState.players.push({
-            id: aiId,
-            name: aiName,
-            isAlive: true,
-            isAI: true
-        });
+            // 添加AI玩家到玩家列表
+            this.gameState.players.push({
+                id: aiId,
+                name: aiName,
+                isAlive: true,
+                isAI: true
+            });
 
-        console.log(`Added AI player: ${aiName}`);
-        this.notifyGameStateUpdate();
+            console.log(`Added AI player: ${aiName} with ID: ${aiId}`);
+            
+            // 添加系统消息
+            const joinMessage = {
+                system: true,
+                type: 'system',
+                message: `${aiName} 加入了游戏`,
+                timestamp: Date.now()
+            };
+            this.messages.push(joinMessage);
+            this.notifyNewMessage(joinMessage);
+            
+            this.notifyGameStateUpdate();
+        } catch (error) {
+            console.error('添加AI玩家失败:', error);
+        }
     }
 
     // 开始游戏
@@ -690,14 +713,22 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
 
     // 通知方法
     notifyGameStateUpdate() {
-        if (this.onGameStateUpdate) {
-            this.onGameStateUpdate({...this.gameState}); // 发送游戏状态的副本
+        try {
+            if (this.onGameStateUpdate && typeof this.onGameStateUpdate === 'function') {
+                this.onGameStateUpdate({...this.gameState});
+            }
+        } catch (error) {
+            console.error('通知游戏状态更新失败:', error);
         }
     }
 
     notifyNewMessage(message) {
-        if (this.onNewMessage) {
-            this.onNewMessage(message);
+        try {
+            if (this.onNewMessage && typeof this.onNewMessage === 'function') {
+                this.onNewMessage(message);
+            }
+        } catch (error) {
+            console.error('通知新消息失败:', error);
         }
     }
 
@@ -1253,33 +1284,118 @@ ${tiedPlayers.map(p => p.name).join('、')}
         }
     }
 
-    // 添加生成词语对的方法
+    // 修改生成词语对的方法
     async generateWordPair() {
+        // 构建已使用词语对的列表，用于提示 LLM
+        let usedPairsText = '';
+        if (this.usedWordPairs.length > 0) {
+            usedPairsText = '以下是已经使用过的词语对，请不要生成相同或相似的词语：\n';
+            this.usedWordPairs.slice(-10).forEach((pair, index) => {
+                usedPairsText += `${index + 1}. 平民词: "${pair.civilian}", 卧底词: "${pair.undercover}"\n`;
+            });
+            usedPairsText += '\n';
+        }
+
         const prompt = `请生成一对相似但有区别的中文词语，用于"谁是卧底"游戏。
+${usedPairsText}
 要求：
 1. 两个词语应该相似但有明显区别
 2. 词语应该是常见的名词
 3. 不要太难猜也不要太容易区分
-4. 直接返回JSON格式：{"civilian": "词语1", "undercover": "词语2"}
-5. 不要有任何解释或其他文字`;
+4. 不要生成与已使用词语相同或相似的词语对
+5. 直接返回JSON格式：{"civilian": "词语1", "undercover": "词语2"}
+6. 不要有任何解释或其他文字`;
 
         try {
-            const response = await this.callLLM(prompt, () => {});
-            // const response = await this.callLLM(prompt, () => {});
+            // 添加随机数，避免缓存
+            const randomSeed = Math.random().toString(36).substring(2, 15);
+            const finalPrompt = `${prompt}\n随机种子: ${randomSeed}`;
+            
+            console.log('发送给 LLM 的提示:', finalPrompt);
+            
+            const response = await this.callLLM(finalPrompt, () => {});
             // 尝试从回答中提取JSON
             const jsonMatch = response.match(/\{.*\}/s);
             if (jsonMatch) {
                 const wordPair = JSON.parse(jsonMatch[0]);
                 if (wordPair.civilian && wordPair.undercover) {
                     console.log('生成的词语对:', wordPair);
+                    
+                    // 检查是否已使用过这个词语对
+                    const isDuplicate = this.usedWordPairs.some(pair => 
+                        (pair.civilian === wordPair.civilian && pair.undercover === wordPair.undercover) ||
+                        (pair.civilian === wordPair.undercover && pair.undercover === wordPair.civilian)
+                    );
+                    
+                    if (isDuplicate) {
+                        console.log('词语对重复，重新生成');
+                        return this.getUniqueWordPair();
+                    }
+                    
+                    // 记录已使用的词语对
+                    this.usedWordPairs.push(wordPair);
+                    
+                    // 保存到本地存储
+                    this.saveUsedWordPairs();
+                    
                     return wordPair;
                 }
             }
             throw new Error('无法解析生成的词语对');
         } catch (error) {
             console.error('生成词语对失败:', error);
-            // 如果生成失败，返回预设词语对中的随机一个
-            return this.wordPairs[Math.floor(Math.random() * this.wordPairs.length)];
+            // 如果生成失败，返回未使用过的预设词语对
+            return this.getUniqueWordPair();
+        }
+    }
+    
+    // 获取未使用过的唯一词语对
+    getUniqueWordPair() {
+        // 过滤出未使用过的预设词语对
+        const unusedPairs = this.wordPairs.filter(pair => 
+            !this.usedWordPairs.some(usedPair => 
+                (usedPair.civilian === pair.civilian && usedPair.undercover === pair.undercover) ||
+                (usedPair.civilian === pair.undercover && usedPair.undercover === pair.civilian)
+            )
+        );
+        
+        if (unusedPairs.length > 0) {
+            // 如果有未使用的词语对，随机选择一个
+            const randomPair = unusedPairs[Math.floor(Math.random() * unusedPairs.length)];
+            
+            // 记录已使用
+            this.usedWordPairs.push(randomPair);
+            this.saveUsedWordPairs();
+            
+            return randomPair;
+        } else {
+            // 如果所有预设词语对都已使用，随机选择一个（此时会重复）
+            console.log('所有预设词语对已用完，开始重复使用');
+            const randomPair = this.wordPairs[Math.floor(Math.random() * this.wordPairs.length)];
+            return randomPair;
+        }
+    }
+    
+    // 保存已使用的词语对到本地存储
+    saveUsedWordPairs() {
+        try {
+            localStorage.setItem('usedWordPairs', JSON.stringify(this.usedWordPairs));
+        } catch (error) {
+            console.error('保存已使用词语对失败:', error);
+        }
+    }
+    
+    // 从本地存储加载已使用的词语对
+    loadUsedWordPairs() {
+        try {
+            const saved = localStorage.getItem('usedWordPairs');
+            if (saved) {
+                this.usedWordPairs = JSON.parse(saved);
+                console.log(`已加载 ${this.usedWordPairs.length} 个已使用的词语对`);
+            }
+        } catch (error) {
+            console.error('加载已使用词语对失败:', error);
+            this.usedWordPairs = [];
         }
     }
 
