@@ -274,4 +274,66 @@
     margin-top: 10px;
     font-size: 0.9em;
     color: #ffeb3b;
+}
+
+/* 添加发言气泡样式 */
+.speech-bubble {
+    position: absolute;
+    width: 150px; /* 固定宽度 */
+    background-color: white;
+    border-radius: 10px;
+    padding: 8px 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    font-size: 12px;
+    line-height: 1.4;
+    z-index: 5;
+    opacity: 0.8;
+    transition: all 0.3s ease;
+    
+    /* 统一位置：右上角 */
+    top: -10px;
+    left: 70px;
+    
+    /* 文本样式 */
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.speech-bubble p {
+    margin: 0;
+    padding: 0;
+    white-space: normal; /* 允许自然换行 */
+    word-break: break-word; /* 长单词可以换行 */
+}
+
+/* 气泡箭头样式 */
+.speech-bubble:after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: 8px solid transparent;
+    
+    /* 统一箭头位置：指向左侧的玩家头像 */
+    right: 100%;
+    top: 15px;
+    border-right-color: white;
+}
+
+/* 当前发言玩家的气泡高亮 */
+.speech-bubble.active {
+    opacity: 1;
+    background-color: #e3f2fd;
+    box-shadow: 0 3px 10px rgba(33, 150, 243, 0.3);
+}
+
+/* 当前发言玩家的气泡箭头也要高亮 */
+.speech-bubble.active:after {
+    border-right-color: #e3f2fd;
+}
+
+/* 当玩家被淘汰时，淡化其发言 */
+.virtual-player.eliminated .speech-bubble {
+    opacity: 0.5;
 } 

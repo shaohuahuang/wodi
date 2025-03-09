@@ -282,7 +282,7 @@ const Room = ({ gameManager, username }) => {
             <div className="virtual-table-wrapper">
                 <VirtualTable 
                     players={gameState.players}
-                    gameState={gameState}
+                    gameState={{...gameState, messages: messages}}
                     onVote={handleVote}
                     currentUser={username}
                     maxPlayers={8}

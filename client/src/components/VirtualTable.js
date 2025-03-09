@@ -1,7 +1,26 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/VirtualTable.css';
 
 const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 }) => {
+    // 添加状态来存储每个玩家的最新发言
+    const [playerMessages, setPlayerMessages] = useState({});
+    
+    // 监听消息变化，更新玩家发言
+    useEffect(() => {
+        if (gameState.messages) {
+            const latestMessages = {};
+            
+            // 从最新的消息开始遍历，找到每个玩家的最新发言
+            [...gameState.messages].reverse().forEach(msg => {
+                if (!msg.system && msg.playerId && !latestMessages[msg.playerId]) {
+                    latestMessages[msg.playerId] = msg.message;
+                }
+            });
+            
+            setPlayerMessages(latestMessages);
+        }
+    }, [gameState.messages]);
+    
     console.log("VirtualTable rendering with players:", players);
     console.log("Current game state:", gameState);
     
@@ -103,6 +122,7 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
         const isCurrentUser = player.id === 'host';
         const votesReceived = getVotesReceived(player.id);
         const playerVote = getPlayerVote(player.id);
+        const latestMessage = playerMessages[player.id];
 
         return (
             <div 
@@ -121,6 +141,14 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
                     )}
                     {isSpeaking && <div className="speaking-indicator"></div>}
                 </div>
+                
+                {/* 添加发言气泡 */}
+                {latestMessage && (
+                    <div className={`speech-bubble ${isSpeaking ? 'active' : ''}`}>
+                        <p>{latestMessage}</p>
+                    </div>
+                )}
+                
                 <div className="player-info">
                     <div className="player-name">{player.name}</div>
                     {isCurrentUser && gameState.myWord && <div className="player-word">{gameState.myWord}</div>}
