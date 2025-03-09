@@ -25,6 +25,8 @@ const Room = ({ gameManager, username }) => {
     const [votes, setVotes] = useState(new Map());
     const [timeLeft, setTimeLeft] = useState(0);
     const [showSettings, setShowSettings] = useState(false);
+    const [showSpeakingDialog, setShowSpeakingDialog] = useState(false);
+    const [speakingContent, setSpeakingContent] = useState('');
 
     useEffect(() => {
         // 设置事件处理器
@@ -101,13 +103,27 @@ const Room = ({ gameManager, username }) => {
         console.log('Username:', username);
     }, [gameState, username]);
 
+    useEffect(() => {
+        if (gameState.currentPhase === 'speaking' && gameState.currentSpeaker === 'host') {
+            setShowSpeakingDialog(true);
+            setSpeakingContent('');
+        } else {
+            setShowSpeakingDialog(false);
+        }
+    }, [gameState.currentPhase, gameState.currentSpeaker]);
+
     const handleStartGame = () => {
         gameManager.startGame();
     };
 
     const handleFinishSpeaking = () => {
         if (gameState.currentSpeaker === 'host') {
+            if (speakingContent.trim()) {
+                gameManager.sendMessage(speakingContent.trim());
+            }
             gameManager.finishSpeaking('host');
+            setShowSpeakingDialog(false);
+            setSpeakingContent('');
         }
     };
 
@@ -313,16 +329,6 @@ const Room = ({ gameManager, username }) => {
                         </button>
                     </>
                 )}
-
-                {gameState.currentPhase === 'speaking' && 
-                 gameState.currentSpeaker === 'host' && (
-                    <button 
-                        onClick={handleFinishSpeaking}
-                        className="finish-speaking-button"
-                    >
-                        结束发言
-                    </button>
-                )}
             </div>
 
             <div className="chat">
@@ -366,6 +372,39 @@ const Room = ({ gameManager, username }) => {
                     onUpdate={gameManager.updateSettings.bind(gameManager)}
                     onClose={() => setShowSettings(false)}
                 />
+            )}
+
+            {/* 发言对话框 */}
+            {showSpeakingDialog && (
+                <div className="speaking-dialog-overlay">
+                    <div className="speaking-dialog">
+                        <h3>轮到你发言</h3>
+                        <p>请描述你看到的词语，注意不要太明显暴露自己的身份。</p>
+                        {gameState.myWord && (
+                            <div className="my-word">
+                                你的词语: <span>{gameState.myWord}</span>
+                            </div>
+                        )}
+                        
+                        <div className="speaking-input-container">
+                            <textarea
+                                className="speaking-input"
+                                placeholder="在这里输入你的发言..."
+                                value={speakingContent}
+                                onChange={(e) => setSpeakingContent(e.target.value)}
+                                rows={4}
+                                autoFocus
+                            ></textarea>
+                        </div>
+                        
+                        <button 
+                            onClick={handleFinishSpeaking}
+                            className="finish-speaking-button"
+                        >
+                            {speakingContent.trim() ? '发送并结束发言' : '结束发言'}
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );
