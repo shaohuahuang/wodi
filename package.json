@@ -1,0 +1,11 @@
+{
+  "name": "wodi",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:shaohuahuang/wodi.git",
+  "scripts": {
+    "build": "cd client && yarn build && cd build && cp -r * ../../"
+  },
+  "author": "shaun <shaun.huang@airwallex.com>",
+  "license": "MIT"
+}
