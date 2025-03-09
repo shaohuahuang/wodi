@@ -133,17 +133,24 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
         const isVoting = gameState.currentVoter === player.id;
         const isEliminated = player.isAlive === false;
         const isCurrentUser = player.id === 'host';
-        const votesReceived = getVotesReceived(player.id);
-        const playerVote = getPlayerVote(player.id);
+        const isGameEnded = gameState.currentPhase === 'ended';
+        
+        // 只在游戏未结束时显示投票信息
+        const votesReceived = isGameEnded ? 0 : getVotesReceived(player.id);
+        const playerVote = isGameEnded ? null : getPlayerVote(player.id);
+        
         const latestMessage = playerMessages[player.id];
+        const playerRole = isGameEnded ? (player.role === 'undercover' ? '卧底' : '平民') : null;
+        const playerWord = isGameEnded ? player.word : null;
 
         return (
             <div 
                 key={player.id} 
                 className={`virtual-player ${isSpeaking ? 'speaking' : ''} 
-                    ${isVoting ? 'voting' : ''} 
+                    ${isVoting && !isGameEnded ? 'voting' : ''} 
                     ${isEliminated ? 'eliminated' : ''} 
-                    ${isCurrentUser ? 'current-user' : ''}`}
+                    ${isCurrentUser ? 'current-user' : ''}
+                    ${isGameEnded ? 'game-ended' : ''}`}
                 style={position}
             >
                 <div className="player-avatar">
@@ -164,17 +171,29 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
                 
                 <div className="player-info">
                     <div className="player-name">{player.name}</div>
-                    {isCurrentUser && gameState.myWord && <div className="player-word">{gameState.myWord}</div>}
+                    {(isCurrentUser && gameState.myWord && !isGameEnded) && <div className="player-word">{gameState.myWord}</div>}
                     {votesReceived > 0 && <div className="votes-received">{votesReceived} 票</div>}
+                    
+                    {/* 游戏结束时显示身份和词语 */}
+                    {isGameEnded && (
+                        <div className="player-role-info">
+                            <div className={`player-role ${playerRole === '卧底' ? 'undercover' : 'civilian'}`}>
+                                {playerRole}
+                            </div>
+                            <div className="player-word game-ended">
+                                词语: {playerWord}
+                            </div>
+                        </div>
+                    )}
                 </div>
                 
-                {/* 添加淘汰标记 */}
-                {isEliminated && (
+                {/* 添加淘汰标记，但在游戏结束时不显示 */}
+                {isEliminated && !isGameEnded && (
                     <div className="eliminated-marker">已淘汰</div>
                 )}
                 
-                {/* 投票按钮 */}
-                {gameState.currentVoter === 'host' && 
+                {/* 投票按钮 - 游戏结束时不显示 */}
+                {!isGameEnded && gameState.currentVoter === 'host' && 
                  !isCurrentUser && 
                  player.isAlive && 
                  (gameState.currentPhase === 'voting' || gameState.currentPhase === 'tiebreaker') && (
@@ -187,8 +206,8 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
                     </button>
                 )}
                 
-                {/* 玩家投票指示 */}
-                {playerVote && (
+                {/* 玩家投票指示 - 游戏结束时不显示 */}
+                {playerVote && !isGameEnded && (
                     <div className={`vote-indicator ${isCurrentUser ? 'host-vote' : ''}`}>
                         <div className="vote-arrow"></div>
                         <div className="vote-target">

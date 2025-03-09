@@ -378,4 +378,48 @@
     border-top: none;
     border-bottom: 8px solid #ff9800;
     margin-bottom: 2px;
+}
+
+/* 游戏结束时的玩家信息样式 */
+.virtual-player.game-ended .player-info {
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 8px 12px;
+    min-width: 140px;
+    max-width: 180px;
+    z-index: 20;
+}
+
+.player-role-info {
+    margin-top: 5px;
+    border-top: 1px dashed #ccc;
+    padding-top: 5px;
+}
+
+.player-role {
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 10px;
+    display: inline-block;
+    margin-bottom: 3px;
+}
+
+.player-role.undercover {
+    background-color: #f44336;
+    color: white;
+}
+
+.player-role.civilian {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.player-word.game-ended {
+    color: #673AB7;
+    font-size: 12px;
+    font-weight: normal;
+}
+
+/* 游戏结束时淡化气泡 */
+.virtual-player.game-ended .speech-bubble {
+    opacity: 0.3;
 } 
