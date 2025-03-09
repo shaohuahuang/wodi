@@ -30,7 +30,7 @@ const Login = ({ gameManager }) => {
         
         // 保存用户名并导航到主页
         localStorage.setItem('username', username);
-        // navigate('/');
+        navigate('/');
         window.location.reload();
     };
 
