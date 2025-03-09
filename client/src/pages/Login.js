@@ -1,65 +1,83 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSocket } from '../context/SocketContext';
 import '../styles/Login.css';
+import ApiKeyInput from '../components/ApiKeyInput';
 
-const Login = () => {
+const Login = ({ gameManager }) => {
     const navigate = useNavigate();
-    const socket = useSocket();
     const [username, setUsername] = useState('');
     const [error, setError] = useState('');
+    const [showApiKeyInput, setShowApiKeyInput] = useState(false);
 
     useEffect(() => {
-        // 如果已经登录，直接跳转到首页
-        const loggedInUser = localStorage.getItem('username');
-        if (loggedInUser) {
-            // 如果已登录，先请求房间列表再跳转
-            if (socket) {
-                socket.emit('getRoomsList');
-            }
+        // 检查是否已经登录
+        const savedUsername = localStorage.getItem('username');
+        if (savedUsername) {
             navigate('/');
         }
-    }, [navigate, socket]);
+    }, [navigate]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        
         if (!username.trim()) {
             setError('请输入用户名');
             return;
         }
-
-        // 存储用户名
-        localStorage.setItem('username', username.trim());
         
-        // 登录成功后，先请求房间列表再跳转
-        if (socket) {
-            socket.emit('getRoomsList');
+        if (username.length < 2 || username.length > 10) {
+            setError('用户名长度应在2-10个字符之间');
+            return;
         }
         
+        // 显示 API Key 输入界面
+        setShowApiKeyInput(true);
+    };
+    
+    const handleApiKeySubmit = (apiKey) => {
+        // 设置 API Key
+        gameManager.setApiKey(apiKey);
+        
+        // 保存用户名并导航到主页
+        localStorage.setItem('username', username);
+        navigate('/');
+    };
+    
+    const handleApiKeySkip = () => {
+        // 跳过 API Key 设置，使用默认模型
+        gameManager.setApiKey(null);
+        
+        // 保存用户名并导航到主页
+        localStorage.setItem('username', username);
         navigate('/');
     };
 
     return (
         <div className="login-container">
-            <div className="login-box">
+            <div className="login-card">
                 <h1>谁是卧底</h1>
-                <h2>用户登录</h2>
-                {error && <div className="error">{error}</div>}
+                <p>请输入您的用户名开始游戏</p>
+                
+                {error && <div className="login-error">{error}</div>}
+                
                 <form onSubmit={handleSubmit}>
-                    <div className="input-group">
-                        <input
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            placeholder="请输入用户名"
-                            maxLength={10}
-                        />
-                    </div>
-                    <button type="submit" className="login-button">
-                        进入游戏
-                    </button>
+                    <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="输入用户名 (2-10个字符)"
+                        maxLength={10}
+                    />
+                    <button type="submit">开始游戏</button>
                 </form>
             </div>
+            
+            {showApiKeyInput && (
+                <ApiKeyInput 
+                    onSubmit={handleApiKeySubmit}
+                    onSkip={handleApiKeySkip}
+                />
+            )}
         </div>
     );
 };

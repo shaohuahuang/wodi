@@ -160,4 +160,57 @@
 .create-button:disabled {
     background-color: #cccccc;
     cursor: not-allowed;
+}
+
+/* 修改游戏选项卡片样式，适应单一选项 */
+.game-options {
+    display: flex;
+    justify-content: center;
+    margin: 50px 0;
+}
+
+.option-card.single-option {
+    max-width: 500px;
+    padding: 30px;
+    text-align: center;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.option-card.single-option:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.option-card.single-option h3 {
+    color: #333;
+    font-size: 24px;
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.option-card.single-option p {
+    color: #666;
+    font-size: 16px;
+    margin-bottom: 30px;
+}
+
+.option-button.local-game {
+    background-color: #4CAF50;
+    color: white;
+    padding: 15px 30px;
+    font-size: 18px;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.option-button.local-game:hover {
+    background-color: #388E3C;
+    transform: scale(1.05);
+    box-shadow: 0 6px 10px rgba(0,0,0,0.15);
 } 

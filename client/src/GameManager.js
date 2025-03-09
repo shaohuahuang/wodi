@@ -43,6 +43,8 @@ class GameManager {
         this.timer = null;
         this.timeLeft = 0;
         this.onTimerUpdate = null;
+        this.useDeepSeekApi = false;
+        this.apiKey = null;
     }
 
     // 创建新游戏
@@ -187,7 +189,83 @@ class GameManager {
     }
 
     // 修改调用大模型接口方法
-    async callLLM(prompt, onChunk) {
+    async callLLM(prompt, onProgress = null) {
+        if (this.useDeepSeekApi && this.apiKey) {
+            return this.callDeepSeekAPI(prompt, onProgress);
+        } else {
+            // 使用默认模型（可以是本地模型或其他 API）
+            return this.callDefaultLLM(prompt, onProgress);
+        }
+    }
+
+    // 添加 DeepSeek API 调用方法
+    async callDeepSeekAPI(prompt, onProgress = false) {
+        //TODO: always use non streaming mode
+        onProgress = false;
+        try {
+            const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'deepseek-chat',
+                    messages: [
+                        { role: 'system', content: '你是一个谁是卧底游戏的AI助手，请根据用户的提示提供简洁、有用的回答。' },
+                        { role: 'user', content: prompt }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 800,
+                    stream: !!onProgress
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API 请求失败: ${response.status}`);
+            }
+
+            if (onProgress) {
+                // 处理流式响应
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullText = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    try {
+                        // 解析 SSE 格式的响应
+                        const lines = chunk.split('\n');
+                        for (const line of lines) {
+                            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                                const data = JSON.parse(line.substring(6));
+                                const content = data.choices[0]?.delta?.content || '';
+                                fullText += content;
+                                onProgress(fullText);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('解析流式响应失败:', e);
+                    }
+                }
+                
+                return fullText;
+            } else {
+                // 处理非流式响应
+                const data = await response.json();
+                return data.choices[0]?.message?.content || '';
+            }
+        } catch (error) {
+            console.error('DeepSeek API 调用失败:', error);
+            throw error;
+        }
+    }
+
+    // 默认 LLM 调用方法（保留原有逻辑）
+    async callDefaultLLM(prompt, onProgress = null) {
         try {
             const response = await fetch('http://localhost:11434/api/generate', {
                 method: 'POST',
@@ -213,12 +291,12 @@ class GameManager {
             fullMessage = fullMessage.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
             
             // 如果需要模拟流式输出效果，可以在这里实现
-            if (onChunk && typeof onChunk === 'function' && fullMessage && onChunk !== (() => {})) {
+            if (onProgress && typeof onProgress === 'function' && fullMessage && onProgress !== (() => {})) {
                 // 模拟逐字输出效果
                 let displayedMessage = '';
                 for (const char of fullMessage) {
                     displayedMessage += char;
-                    onChunk(char);
+                    onProgress(displayedMessage);
                     // 添加一个小延迟，模拟打字效果
                     await new Promise(resolve => setTimeout(resolve, 30));
                 }
@@ -1201,6 +1279,17 @@ ${tiedPlayers.map(p => p.name).join('、')}
             console.error('生成词语对失败:', error);
             // 如果生成失败，返回预设词语对中的随机一个
             return this.wordPairs[Math.floor(Math.random() * this.wordPairs.length)];
+        }
+    }
+
+    // 添加 DeepSeek API 支持
+    setApiKey(apiKey) {
+        try {
+            this.apiKey = apiKey;
+            this.useDeepSeekApi = !!apiKey;
+            console.log(`使用 ${this.useDeepSeekApi ? 'DeepSeek API' : '默认模型'}`);
+        } catch (error) {
+            console.error('设置 API Key 失败:', error);
         }
     }
 }

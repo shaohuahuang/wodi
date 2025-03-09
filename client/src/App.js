@@ -1,47 +1,40 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import Login from './components/Login';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Home from './pages/Home';
 import Room from './components/Room';
+import Login from './pages/Login';
+import { SocketProvider } from './context/SocketContext';
 import GameManager from './GameManager';
 import './styles/App.css';
 
-function App() {
-    const [gameManager] = useState(() => {
-        const manager = new GameManager();
-        const savedUsername = localStorage.getItem('username');
-        if (savedUsername) {
-            manager.createGame(savedUsername);
-        }
-        return manager;
-    });
-    const [username, setUsername] = useState(localStorage.getItem('username') || '');
+// 创建 GameManager 实例
+const gameManager = new GameManager();
 
-    const handleLogin = (name) => {
-        setUsername(name);
-        localStorage.setItem('username', name);
-        gameManager.createGame(name);
+function App() {
+    // 检查用户是否已登录
+    const isLoggedIn = () => {
+        return localStorage.getItem('username') !== null;
     };
 
     return (
         <Router>
-            <Routes>
-                <Route 
-                    path="/" 
-                    element={
-                        username ? 
-                            <Navigate to="/room" /> : 
-                            <Login onLogin={handleLogin} />
-                    } 
-                />
-                <Route 
-                    path="/room" 
-                    element={
-                        username ? 
-                            <Room gameManager={gameManager} username={username} /> : 
-                            <Navigate to="/" />
-                    } 
-                />
-            </Routes>
+            <SocketProvider>
+                <Routes>
+                    <Route path="/login" element={<Login gameManager={gameManager} />} />
+                    <Route 
+                        path="/" 
+                        element={isLoggedIn() ? <Home gameManager={gameManager} /> : <Navigate to="/login" />} 
+                    />
+                    <Route 
+                        path="/room" 
+                        element={isLoggedIn() ? <Room gameManager={gameManager} username={localStorage.getItem('username')} /> : <Navigate to="/login" />} 
+                    />
+                    <Route 
+                        path="/room/:roomId" 
+                        element={isLoggedIn() ? <Room /> : <Navigate to="/login" />} 
+                    />
+                </Routes>
+            </SocketProvider>
         </Router>
     );
 }
