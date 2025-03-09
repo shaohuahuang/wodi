@@ -189,7 +189,7 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
                 
                 {/* 玩家投票指示 */}
                 {playerVote && (
-                    <div className="vote-indicator">
+                    <div className={`vote-indicator ${isCurrentUser ? 'host-vote' : ''}`}>
                         <div className="vote-arrow"></div>
                         <div className="vote-target">
                             {players.find(p => p.id === playerVote)?.name}

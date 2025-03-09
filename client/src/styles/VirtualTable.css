@@ -153,6 +153,7 @@
     flex-direction: column;
     align-items: center;
     margin-top: 5px;
+    z-index: 15;
 }
 
 .vote-arrow {
@@ -361,4 +362,20 @@
     font-weight: bold;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     z-index: 10;
+}
+
+/* 为底部玩家(房主)特别调整投票指示器位置 */
+.virtual-player.current-user .vote-indicator {
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+
+/* 调整底部玩家的投票箭头方向 */
+.virtual-player.current-user .vote-arrow {
+    transform: rotate(180deg);
+    border-top: none;
+    border-bottom: 8px solid #ff9800;
+    margin-bottom: 2px;
 } 
