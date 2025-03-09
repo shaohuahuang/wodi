@@ -184,10 +184,13 @@
 
 .virtual-player.eliminated .player-avatar {
     opacity: 0.5;
+    filter: grayscale(100%);
+    border: 2px solid #f44336;
 }
 
 .virtual-player.eliminated .player-info {
     opacity: 0.7;
+    background-color: rgba(244, 67, 54, 0.1);
 }
 
 .virtual-player.current-user .player-avatar {
@@ -336,4 +339,26 @@
 /* 当玩家被淘汰时，淡化其发言 */
 .virtual-player.eliminated .speech-bubble {
     opacity: 0.5;
+    background-color: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+.virtual-player.eliminated .speech-bubble:after {
+    border-right-color: rgba(244, 67, 54, 0.1);
+}
+
+/* 添加淘汰标记 */
+.eliminated-marker {
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #f44336;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 10;
 } 

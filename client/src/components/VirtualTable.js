@@ -5,6 +5,19 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
     // 添加状态来存储每个玩家的最新发言
     const [playerMessages, setPlayerMessages] = useState({});
     
+    // 添加一个状态来跟踪当前轮次
+    const [currentRound, setCurrentRound] = useState(0);
+    
+    // 监听游戏状态变化，只在轮次变化时清除气泡
+    useEffect(() => {
+        // 只有当轮次变化时，清除所有气泡
+        if (gameState.currentRound && gameState.currentRound !== currentRound) {
+            console.log("New round detected, clearing speech bubbles");
+            setPlayerMessages({});
+            setCurrentRound(gameState.currentRound);
+        }
+    }, [gameState.currentRound, currentRound]);
+    
     // 监听消息变化，更新玩家发言
     useEffect(() => {
         if (gameState.messages) {
@@ -118,7 +131,7 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
         // 正常玩家渲染
         const isSpeaking = gameState.currentSpeaker === player.id;
         const isVoting = gameState.currentVoter === player.id;
-        const isEliminated = !player.isAlive;
+        const isEliminated = player.isAlive === false;
         const isCurrentUser = player.id === 'host';
         const votesReceived = getVotesReceived(player.id);
         const playerVote = getPlayerVote(player.id);
@@ -154,6 +167,11 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
                     {isCurrentUser && gameState.myWord && <div className="player-word">{gameState.myWord}</div>}
                     {votesReceived > 0 && <div className="votes-received">{votesReceived} 票</div>}
                 </div>
+                
+                {/* 添加淘汰标记 */}
+                {isEliminated && (
+                    <div className="eliminated-marker">已淘汰</div>
+                )}
                 
                 {/* 投票按钮 */}
                 {gameState.currentVoter === 'host' && 
