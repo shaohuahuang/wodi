@@ -1,12 +1,16 @@
 .room {
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
+  background-color: #f5f5f5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .game-info {
   background-color: white;
-  padding: 20px;
+  padding: 15px;
   border-radius: 10px;
   margin-bottom: 20px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -107,6 +111,7 @@
   padding: 20px;
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  margin-top: 20px;
 }
 
 .messages {
@@ -566,6 +571,12 @@
     background-color: #f57c00;
 }
 
-.vote-button.tiebreaker.voted {
-    background-color: #e65100;
+/* 添加虚拟桌包装器样式 */
+.virtual-table-wrapper {
+    width: 100%;
+    margin: 20px 0;
+    background-color: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 } 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/Room.css';
 import GameSettings from './GameSettings';
+import VirtualTable from './VirtualTable';
 
 const Room = ({ gameManager, username }) => {
     const navigate = useNavigate();
@@ -277,56 +278,15 @@ const Room = ({ gameManager, username }) => {
                 </div>
             </div>
 
-            <div className="players-container">
-                <h3>玩家列表 ({gameState.players.length}/8)</h3>
-                <div className="players-list">
-                    {gameState.players.map(player => (
-                        <div key={player.id} 
-                            className={`player 
-                                ${player.id === 'host' ? 'current-player' : ''} 
-                                ${getPlayerVote('host') === player.id ? 'voted-for' : ''}
-                                ${gameState.currentPhase === 'speaking' && gameState.currentSpeaker === player.id ? 'speaking' : ''}
-                            `}
-                        >
-                            <div className="player-info">
-                                <span className="player-name">{player.name}</span>
-                                {player.id === 'host' && <span className="player-tag">(你)</span>}
-                                {player.isAI && <span className="ai-tag">AI</span>}
-                                {gameState.currentSpeaker === player.id && 
-                                    <span className="speaking-tag">正在发言</span>}
-                                {!player.isAlive && <span className="dead-tag">已出局</span>}
-                                {gameState.currentPhase === 'voting' && (
-                                    <span className="votes-tag">
-                                        被指认: {getVotesReceived(player.id)} 票
-                                    </span>
-                                )}
-                            </div>
-                            <div className="player-actions">
-                                {renderVoteButton(player)}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {gameState.currentPhase === 'voting' && votes.size > 0 && (
-                    <div className="voting-summary">
-                        <h4>当前投票情况：</h4>
-                        <div className="votes-list">
-                            {Array.from(votes.entries()).map(([voterId, targetId]) => {
-                                const voter = gameState.players.find(p => p.id === voterId);
-                                const target = gameState.players.find(p => p.id === targetId);
-                                if (!voter || !target || !voter.isAlive || !target.isAlive) return null;
-                                return (
-                                    <div key={voterId} className="vote-record">
-                                        <span className="voter">{voter.name}</span>
-                                        <span className="vote-arrow">→</span>
-                                        <span className="target">{target.name}</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
+            {/* 确保虚拟桌组件在游戏开始后显示 */}
+            <div className="virtual-table-wrapper">
+                <VirtualTable 
+                    players={gameState.players}
+                    gameState={gameState}
+                    onVote={handleVote}
+                    currentUser={username}
+                    maxPlayers={8}
+                />
             </div>
 
             <div className="game-controls">
@@ -410,8 +370,6 @@ const Room = ({ gameManager, username }) => {
                     onClose={() => setShowSettings(false)}
                 />
             )}
-
-            {renderVotingArea()}
         </div>
     );
 }
