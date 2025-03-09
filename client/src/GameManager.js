@@ -784,9 +784,17 @@ ${gameInfo.alivePlayers.map(p => p.name).join(', ')}
         this.gameState.tiedPlayers = tiedPlayerIds;
         this.gameState.votes = new Map();
         
-        // 设置投票顺序（所有存活玩家）
-        const alivePlayers = this.gameState.players.filter(p => p.isAlive);
-        this.gameState.votingOrder = alivePlayers.map(p => p.id);
+        // 设置投票顺序（只包含存活且不在平票名单中的玩家）
+        const eligibleVoters = this.gameState.players.filter(p => 
+            p.isAlive && !tiedPlayerIds.includes(p.id)
+        );
+        this.gameState.votingOrder = eligibleVoters.map(p => p.id);
+        
+        // 如果没有合格的投票者（极少数情况），让所有存活玩家投票
+        if (this.gameState.votingOrder.length === 0) {
+            const alivePlayers = this.gameState.players.filter(p => p.isAlive);
+            this.gameState.votingOrder = alivePlayers.map(p => p.id);
+        }
         
         // 从第一个玩家开始投票
         this.gameState.currentVoter = this.gameState.votingOrder[0];

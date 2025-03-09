@@ -163,6 +163,88 @@ const Room = ({ gameManager, username }) => {
         );
     };
 
+    // 修改投票区域渲染
+    const renderVotingArea = () => {
+        if (gameState.currentPhase !== 'voting' && gameState.currentPhase !== 'tiebreaker') {
+            return null;
+        }
+
+        const isTiebreaker = gameState.currentPhase === 'tiebreaker';
+        const title = isTiebreaker ? '平票决胜' : '投票阶段';
+        const description = isTiebreaker 
+            ? `请在平票的玩家中选择一个投票淘汰` 
+            : `请选择一名可疑的玩家投票`;
+
+        return (
+            <div className={`voting-area ${isTiebreaker ? 'tiebreaker' : ''}`}>
+                <h3>{title}</h3>
+                <p>{description}</p>
+                
+                {isTiebreaker && (
+                    <div className="tied-players">
+                        <p>平票玩家：</p>
+                        <div className="tied-players-list">
+                            {gameState.tiedPlayers?.map(playerId => {
+                                const player = gameState.players.find(p => p.id === playerId);
+                                return (
+                                    <span key={playerId} className="tied-player">
+                                        {player.name}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+                
+                {/* 投票状态显示 */}
+                <div className="voting-status">
+                    {gameState.currentVoter ? (
+                        <p className={`current-voter ${gameState.currentVoter === 'host' ? 'your-turn' : ''}`}>
+                            {gameState.currentVoter === 'host' ? (
+                                '轮到你投票了'
+                            ) : (
+                                `等待 ${gameState.players.find(p => p.id === gameState.currentVoter)?.name} 投票`
+                            )}
+                        </p>
+                    ) : (
+                        <p className="voting-complete">投票结束，正在统计结果...</p>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    // 修改玩家列表中的投票按钮渲染
+    const renderVoteButton = (player) => {
+        const isTiebreaker = gameState.currentPhase === 'tiebreaker';
+        
+        // 在平票决胜阶段，只能投给平票的玩家
+        if (isTiebreaker && !gameState.tiedPlayers?.includes(player.id)) {
+            return null;
+        }
+        
+        // 在平票决胜阶段，平票玩家不能投票
+        if (isTiebreaker && gameState.tiedPlayers?.includes('host')) {
+            return null;
+        }
+        
+        if ((gameState.currentPhase === 'voting' || gameState.currentPhase === 'tiebreaker') && 
+            player.id !== 'host' && 
+            player.isAlive &&
+            gameState.currentVoter === 'host') {
+            return (
+                <button 
+                    onClick={() => handleVote(player.id)}
+                    className={`vote-button ${isTiebreaker ? 'tiebreaker' : ''} ${getPlayerVote('host') === player.id ? 'voted' : ''}`}
+                >
+                    {getPlayerVote('host') === player.id ? '已投票' : '投票'}
+                </button>
+            );
+        }
+        
+        return null;
+    };
+
     return (
         <div className="room">
             <div className="room-header">
@@ -220,18 +302,7 @@ const Room = ({ gameManager, username }) => {
                                 )}
                             </div>
                             <div className="player-actions">
-                                {gameState.currentPhase === 'voting' && 
-                                 player.id !== 'host' && 
-                                 player.isAlive &&
-                                 gameState.currentVoter === 'host' &&
-                                 (
-                                    <button 
-                                        onClick={() => handleVote(player.id)}
-                                        className={`vote-button ${getPlayerVote('host') === player.id ? 'voted' : ''}`}
-                                    >
-                                        {getPlayerVote('host') === player.id ? '已投票' : '投票'}
-                                    </button>
-                                )}
+                                {renderVoteButton(player)}
                             </div>
                         </div>
                     ))}
@@ -254,22 +325,6 @@ const Room = ({ gameManager, username }) => {
                                 );
                             })}
                         </div>
-                    </div>
-                )}
-
-                {gameState.currentPhase === 'voting' && (
-                    <div className="voting-status">
-                        {gameState.currentVoter ? (
-                            <p className={`current-voter ${gameState.currentVoter === 'host' ? 'your-turn' : ''}`}>
-                                {gameState.currentVoter === 'host' ? (
-                                    '轮到你投票了'
-                                ) : (
-                                    `等待 ${gameState.players.find(p => p.id === gameState.currentVoter)?.name} 投票`
-                                )}
-                            </p>
-                        ) : (
-                            <p className="voting-complete">投票结束，正在统计结果...</p>
-                        )}
                     </div>
                 )}
             </div>
@@ -355,6 +410,8 @@ const Room = ({ gameManager, username }) => {
                     onClose={() => setShowSettings(false)}
                 />
             )}
+
+            {renderVotingArea()}
         </div>
     );
 }
