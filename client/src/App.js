@@ -31,7 +31,7 @@ function App() {
                     />
                     <Route 
                         path="/room/:roomId" 
-                        element={isLoggedIn() ? <Room /> : <Navigate to="/login" />} 
+                        element={isLoggedIn() ? <Room gameManager={gameManager} /> : <Navigate to="/login" />} 
                     />
                 </Routes>
             </SocketProvider>

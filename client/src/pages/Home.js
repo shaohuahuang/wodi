@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/Home.css';
 import ApiKeyInput from '../components/ApiKeyInput';
@@ -6,7 +6,18 @@ import ApiKeyInput from '../components/ApiKeyInput';
 const Home = ({ gameManager }) => {
     const navigate = useNavigate();
     const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-    const username = localStorage.getItem('username');
+    const [username, setUsername] = useState('');
+    
+    // 从 localStorage 获取用户名
+    useEffect(() => {
+        const savedUsername = localStorage.getItem('username');
+        if (savedUsername) {
+            setUsername(savedUsername);
+        } else {
+            // 如果没有用户名，重定向到登录页面
+            navigate('/login');
+        }
+    }, [navigate]);
 
     const handleLogout = () => {
         localStorage.removeItem('username');
@@ -20,12 +31,14 @@ const Home = ({ gameManager }) => {
     
     const handleApiKeySubmit = (apiKey) => {
         try {
-            // 设置 API Key 并创建本地游戏
+            // 设置 API Key
             gameManager.setApiKey(apiKey);
-            createLocalGame();
+            
+            // 创建游戏并导航到游戏房间
+            gameManager.createGame(username);
+            navigate('/room');
         } catch (error) {
             console.error('处理 API Key 失败:', error);
-            // 可以在这里添加错误提示
         }
     };
     
@@ -33,23 +46,19 @@ const Home = ({ gameManager }) => {
         try {
             // 跳过 API Key 设置，使用默认模型
             gameManager.setApiKey(null);
-            createLocalGame();
-        } catch (error) {
-            console.error('跳过 API Key 设置失败:', error);
-            // 可以在这里添加错误提示
-        }
-    };
-    
-    const createLocalGame = () => {
-        try {
-            // 创建本地游戏并导航到游戏房间
+            
+            // 创建游戏并导航到游戏房间
             gameManager.createGame(username);
             navigate('/room');
         } catch (error) {
-            console.error('创建游戏失败:', error);
-            // 可以在这里添加错误提示
+            console.error('跳过 API Key 设置失败:', error);
         }
     };
+
+    // 如果用户名未加载，显示加载状态
+    if (!username) {
+        return <div className="loading">加载中...</div>;
+    }
 
     return (
         <div className="home">

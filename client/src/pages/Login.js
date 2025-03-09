@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/Login.css';
-import ApiKeyInput from '../components/ApiKeyInput';
 
 const Login = ({ gameManager }) => {
     const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [error, setError] = useState('');
-    const [showApiKeyInput, setShowApiKeyInput] = useState(false);
 
     useEffect(() => {
         // 检查是否已经登录
@@ -30,26 +28,10 @@ const Login = ({ gameManager }) => {
             return;
         }
         
-        // 显示 API Key 输入界面
-        setShowApiKeyInput(true);
-    };
-    
-    const handleApiKeySubmit = (apiKey) => {
-        // 设置 API Key
-        gameManager.setApiKey(apiKey);
-        
         // 保存用户名并导航到主页
         localStorage.setItem('username', username);
-        navigate('/');
-    };
-    
-    const handleApiKeySkip = () => {
-        // 跳过 API Key 设置，使用默认模型
-        gameManager.setApiKey(null);
-        
-        // 保存用户名并导航到主页
-        localStorage.setItem('username', username);
-        navigate('/');
+        // navigate('/');
+        window.location.reload();
     };
 
     return (
@@ -68,16 +50,9 @@ const Login = ({ gameManager }) => {
                         placeholder="输入用户名 (2-10个字符)"
                         maxLength={10}
                     />
-                    <button type="submit">开始游戏</button>
+                    <button type="submit">进入游戏</button>
                 </form>
             </div>
-            
-            {showApiKeyInput && (
-                <ApiKeyInput 
-                    onSubmit={handleApiKeySubmit}
-                    onSkip={handleApiKeySkip}
-                />
-            )}
         </div>
     );
 };

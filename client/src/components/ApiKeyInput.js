@@ -51,7 +51,7 @@ const ApiKeyInput = ({ onSubmit, onSkip }) => {
                             className="api-key-submit"
                             disabled={isLoading}
                         >
-                            {isLoading ? '处理中...' : '提交'}
+                            {isLoading ? '处理中...' : '使用 API Key 进入游戏'}
                         </button>
                         
                         <button 
@@ -60,7 +60,7 @@ const ApiKeyInput = ({ onSubmit, onSkip }) => {
                             onClick={onSkip}
                             disabled={isLoading}
                         >
-                            跳过（使用默认模型）
+                            跳过，直接进入游戏
                         </button>
                     </div>
                 </form>
