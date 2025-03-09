@@ -8,19 +8,29 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
     // 添加一个状态来跟踪当前轮次
     const [currentRound, setCurrentRound] = useState(0);
     
-    // 监听游戏状态变化，只在轮次变化时清除气泡
+    // 添加一个状态来控制是否显示气泡
+    const [showBubbles, setShowBubbles] = useState(true);
+    
+    // 监听游戏状态变化，在轮次变化和投票阶段结束时处理气泡显示
     useEffect(() => {
-        // 只有当轮次变化时，清除所有气泡
+        // 当轮次变化时，清除所有气泡并准备新一轮显示
         if (gameState.currentRound && gameState.currentRound !== currentRound) {
             console.log("New round detected, clearing speech bubbles");
             setPlayerMessages({});
             setCurrentRound(gameState.currentRound);
+            // 新一轮开始时，暂时隐藏气泡，等待新的发言
+            setShowBubbles(false);
         }
-    }, [gameState.currentRound, currentRound]);
+        
+        // 当发言阶段开始且有当前发言者时，确保可以显示气泡
+        if (gameState.currentPhase === 'speaking' && gameState.currentSpeaker) {
+            setShowBubbles(true);
+        }
+    }, [gameState.currentPhase, gameState.currentRound, gameState.currentSpeaker, currentRound]);
     
     // 监听消息变化，更新玩家发言
     useEffect(() => {
-        if (gameState.messages) {
+        if (gameState.messages && showBubbles) {
             const latestMessages = {};
             
             // 从最新的消息开始遍历，找到每个玩家的最新发言
@@ -32,7 +42,7 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
             
             setPlayerMessages(latestMessages);
         }
-    }, [gameState.messages]);
+    }, [gameState.messages, showBubbles]);
     
     console.log("VirtualTable rendering with players:", players);
     console.log("Current game state:", gameState);
@@ -139,7 +149,8 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
         const votesReceived = isGameEnded ? 0 : getVotesReceived(player.id);
         const playerVote = isGameEnded ? null : getPlayerVote(player.id);
         
-        const latestMessage = playerMessages[player.id];
+        // 只有在showBubbles为true且该玩家有发言或正在发言时才显示气泡
+        const latestMessage = showBubbles ? playerMessages[player.id] : null;
         const playerRole = isGameEnded ? (player.role === 'undercover' ? '卧底' : '平民') : null;
         const playerWord = isGameEnded ? player.word : null;
 
@@ -162,7 +173,7 @@ const VirtualTable = ({ players, gameState, onVote, currentUser, maxPlayers = 8 
                     {isSpeaking && <div className="speaking-indicator"></div>}
                 </div>
                 
-                {/* 添加发言气泡 */}
+                {/* 添加发言气泡 - 只在允许显示时显示 */}
                 {latestMessage && (
                     <div className={`speech-bubble ${isSpeaking ? 'active' : ''}`}>
                         <p>{latestMessage}</p>
