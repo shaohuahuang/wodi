@@ -247,10 +247,14 @@ const Room = ({ gameManager, username }) => {
     };
 
     return (
-        <div className="room">
+        <div className="room-container">
             <div className="room-header">
                 <div className="room-info">
-                    <h2>房间号: {gameManager.roomId}</h2>
+                    <h2>谁是卧底</h2>
+                    {gameManager.roomId && gameManager.roomId !== 'LOCAL_GAME' && (
+                        <div className="room-id">房间号: {gameManager.roomId}</div>
+                    )}
+                    <div className="player-count">玩家数: {gameState.players.length}</div>
                 </div>
                 <button 
                     onClick={() => {
@@ -269,13 +273,6 @@ const Room = ({ gameManager, username }) => {
                 >
                     退出房间
                 </button>
-            </div>
-
-            <div className="game-info">
-                <div className="current-player-info">
-                    <p>你的名字: <span className="highlight">{username}</span></p>
-                    <p>你的词语: <span className="highlight">{gameState.myWord || '等待游戏开始'}</span></p>
-                </div>
             </div>
 
             {/* 确保虚拟桌组件在游戏开始后显示 */}
