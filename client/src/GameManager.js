@@ -1265,6 +1265,7 @@ ${tiedPlayers.map(p => p.name).join('、')}
 
         try {
             const response = await this.callLLM(prompt, () => {});
+            // const response = await this.callLLM(prompt, () => {});
             // 尝试从回答中提取JSON
             const jsonMatch = response.match(/\{.*\}/s);
             if (jsonMatch) {
